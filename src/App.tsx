@@ -213,16 +213,17 @@ export default function App() {
               onSearch={() => setPanel("search")}
             />
           ) : (
-            <Results
-              data={data!}
-              location={location!}
-              now={now}
-              h12={settings.h12}
-              locating={locating}
-              onSearch={() => setPanel("search")}
-              onLocate={openLocate}
-              onSettings={() => setPanel("settings")}
-            />
+      <Results
+        data={data!}
+        location={location!}
+        now={now}
+        h12={settings.h12}
+        hijriOffset={settings.hijriOffset}
+        locating={locating}
+        onSearch={() => setPanel("search")}
+        onLocate={openLocate}
+        onSettings={() => setPanel("settings")}
+      />
           )}
         </main>
 
@@ -256,6 +257,7 @@ function Results({
   location,
   now,
   h12,
+  hijriOffset,
   locating,
   onSearch,
   onLocate,
@@ -265,6 +267,7 @@ function Results({
   location: LocationInfo;
   now: number;
   h12: boolean;
+  hijriOffset: number;
   locating: boolean;
   onSearch: () => void;
   onLocate: () => void;
@@ -292,7 +295,7 @@ function Results({
         data={data}
         now={now}
         h12={h12}
-        hijriOffset={settings.hijriOffset}
+        hijriOffset={hijriOffset}
         locating={locating}
         onSearch={onSearch}
         onLocate={onLocate}
