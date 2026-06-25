@@ -77,6 +77,37 @@ export default function Qibla({ bearing, lat, lon }: Props) {
     }
   }
 
+  const facingQibla = (() => {
+    if (!active || heading == null) return false;
+    const diff = ((bearing - heading + 540) % 360) - 180;
+    return Math.abs(diff) < 10;
+  })();
+
+  const turnHint = (() => {
+    if (!active || heading == null) return "";
+    const diff = ((bearing - heading + 540) % 360) - 180;
+    const abs = Math.abs(diff);
+    const dir = diff > 0 ? "left" : "right";
+    if (abs < 10) return "Facing Qibla!";
+    return `Rotate ${Math.round(abs)}° ${dir}`;
+  })();
+
+  const cardinal = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][
+    Math.round(bearing / 45) % 8
+  ];
+
+  const kaabaColor =
+    active && heading != null
+      ? facingQibla
+        ? "bg-emerald-500 border-emerald-500 text-white"
+        : "bg-red-500 border-red-500 text-white"
+      : "bg-gold/10 border-gold/40 text-gold";
+
+  const kaabaGlow =
+    active && heading != null && facingQibla
+      ? "shadow-[0_0_24px_rgba(16,185,129,0.5)]"
+      : "";
+
   const distance = haversineKm(lat, lon, KAABA.lat, KAABA.lon);
   const dialRotation = active && heading != null ? -heading : 0;
   const ticks = Array.from({ length: 36 }, (_, i) => i * 10);
@@ -168,13 +199,18 @@ export default function Qibla({ bearing, lat, lon }: Props) {
 
         {/* readout */}
         <div className="flex flex-1 flex-col items-center gap-3 sm:items-end">
-          <div className="text-center sm:text-right">
-            <div className="tnum font-display text-5xl font-bold text-gold">
-              {Math.round(bearing)}
-              <span className="text-2xl">°</span>
+          <div className="flex flex-col items-center sm:items-end">
+            <div
+              className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all duration-300 ${kaabaColor} ${kaabaGlow}`}
+            >
+              <KaabaIcon className="h-8 w-8" />
             </div>
-            <p className="mt-1 text-sm text-cream/55">
-              from North{active && heading != null ? " · live" : ""}
+            <p className="mt-2 text-sm text-cream/55">
+              {active && heading != null
+                ? facingQibla
+                  ? "Qibla found"
+                  : turnHint
+                : `${cardinal} · from North`}
             </p>
           </div>
           <button

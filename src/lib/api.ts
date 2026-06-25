@@ -196,6 +196,68 @@ export function countdown(ms: number): Countdown {
 }
 
 /* ------------------------------------------------------------------ *
+ * Hijri date adjustment
+ * ------------------------------------------------------------------ */
+
+const HIJRI_MONTH_DAYS = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+const HIJRI_MONTH_NAMES = [
+  "Muharram", "Safar", "Rabi' I", "Rabi' II",
+  "Jumada I", "Jumada II", "Rajab", "Sha'ban",
+  "Ramadan", "Shawwal", "Dhu'l-Qi'dah", "Dhu'l-Hijjah",
+];
+
+function isHijriLeapYear(year: number): boolean {
+  const leaps = new Set([2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29]);
+  return leaps.has(year % 30);
+}
+
+function hijriMonthLength(month: number, year: number): number {
+  if (month === 12) return isHijriLeapYear(year) ? 30 : 29;
+  return HIJRI_MONTH_DAYS[month - 1];
+}
+
+function hijriToDays(day: number, month: number, year: number): number {
+  let days = (year - 1) * 354 + Math.floor((year - 1) / 30) * 11;
+  for (let m = 1; m < month; m++) days += hijriMonthLength(m, year);
+  return days + day;
+}
+
+function daysToHijri(total: number): { day: number; month: number; year: number } {
+  let year = 1;
+  while (true) {
+    const yrDays = isHijriLeapYear(year) ? 355 : 354;
+    if (total <= yrDays) break;
+    total -= yrDays;
+    year++;
+  }
+  let month = 1;
+  while (true) {
+    const mDays = hijriMonthLength(month, year);
+    if (total <= mDays) break;
+    total -= mDays;
+    month++;
+  }
+  return { day: total, month, year };
+}
+
+export function adjustedHijri(
+  dayStr: string,
+  monthEn: string,
+  yearStr: string,
+  offset: number,
+): string {
+  if (offset === 0) return `${dayStr} ${monthEn} ${yearStr}`;
+  const day = parseInt(dayStr, 10) || 1;
+  const year = parseInt(yearStr, 10) || 1446;
+  const monthIdx = HIJRI_MONTH_NAMES.indexOf(monthEn) + 1;
+  const month = monthIdx > 0 ? monthIdx : 1;
+  const total = hijriToDays(day, month, year) + offset;
+  if (total < 1) return "1 Muharram 1";
+  const adj = daysToHijri(total);
+  return `${adj.day} ${HIJRI_MONTH_NAMES[adj.month - 1]} ${adj.year}`;
+}
+
+/* ------------------------------------------------------------------ *
  * Qibla
  * ------------------------------------------------------------------ */
 
@@ -320,17 +382,42 @@ export function getGeolocation(): Promise<{ lat: number; lon: number }> {
       reject(new Error("Geolocation is not supported by this browser."));
       return;
     }
+
+    let resolved = false;
+
+    // First try a cached position (instant)
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      (pos) => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        }
+      },
+      () => {
+        /* ignore — fallback below */
+      },
+      { enableHighAccuracy: false, timeout: 0, maximumAge: 86400000 },
+    );
+
+    // Then request a fresh position in the background
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!resolved) {
+          resolved = true;
+          resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        }
+      },
       (err) => {
-        const msg =
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission denied. Search a city instead."
-            : err.code === err.POSITION_UNAVAILABLE
-              ? "Location unavailable. Search a city instead."
-              : "Location request timed out. Search a city instead.";
-        reject(new Error(msg));
+        if (!resolved) {
+          resolved = true;
+          const msg =
+            err.code === err.PERMISSION_DENIED
+              ? "Location permission denied. Search a city instead."
+              : err.code === err.POSITION_UNAVAILABLE
+                ? "Location unavailable. Search a city instead."
+                : "Location request timed out. Search a city instead.";
+          reject(new Error(msg));
+        }
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 },
     );
@@ -340,6 +427,7 @@ export function getGeolocation(): Promise<{ lat: number; lon: number }> {
 /** Load + persist a single location summary in localStorage. */
 const LOC_KEY = "salat.location";
 const SET_KEY = "salat.settings";
+const CACHE_KEY = "salat.cache";
 
 export function loadLocation(): LocationInfo | null {
   try {
@@ -362,6 +450,7 @@ export interface Settings {
   method: number;
   school: number;
   h12: boolean;
+  hijriOffset: number;
 }
 
 export function loadSettings(): Settings {
@@ -369,6 +458,7 @@ export function loadSettings(): Settings {
     method: DEFAULT_METHOD,
     school: 0,
     h12: true,
+    hijriOffset: 0,
   };
   try {
     const raw = localStorage.getItem(SET_KEY);
@@ -381,6 +471,23 @@ export function loadSettings(): Settings {
 export function saveSettings(s: Settings) {
   try {
     localStorage.setItem(SET_KEY, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadCachedData(): PrayerData | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as PrayerData) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCachedData(d: PrayerData) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(d));
   } catch {
     /* ignore */
   }

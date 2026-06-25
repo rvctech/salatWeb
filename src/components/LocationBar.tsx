@@ -8,7 +8,7 @@ import {
   CalendarIcon,
   SparkleIcon,
 } from "./Icons";
-import { zonedClock } from "../lib/api";
+import { zonedClock, adjustedHijri } from "../lib/api";
 import type { LocationInfo, PrayerData } from "../lib/types";
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
   data: PrayerData | null;
   now: number;
   h12: boolean;
+  hijriOffset: number;
   locating: boolean;
   onSearch: () => void;
   onLocate: () => void;
@@ -65,6 +66,7 @@ export default function LocationBar({
   data,
   now,
   h12,
+  hijriOffset = 0,
   locating,
   onSearch,
   onLocate,
@@ -132,7 +134,16 @@ export default function LocationBar({
         <InfoTile
           icon={<SparkleIcon className="h-4 w-4" />}
           label="Hijri date"
-          value={data?.hijri ?? "—"}
+          value={
+            data
+              ? adjustedHijri(
+                  data.hijriDay,
+                  data.hijriMonthEn,
+                  data.hijriYear,
+                  hijriOffset,
+                )
+              : "—"
+          }
           gold
         />
         <InfoTile

@@ -24,6 +24,8 @@ import {
   saveLocation,
   loadSettings,
   saveSettings,
+  loadCachedData,
+  saveCachedData,
   type Settings,
 } from "./lib/api";
 import type { LocationInfo, PrayerData } from "./lib/types";
@@ -35,7 +37,7 @@ export default function App() {
   const [location, setLocation] = useState<LocationInfo | null>(() =>
     loadLocation(),
   );
-  const [data, setData] = useState<PrayerData | null>(null);
+  const [data, setData] = useState<PrayerData | null>(() => loadCachedData());
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
@@ -54,6 +56,7 @@ export default function App() {
     try {
       const d = await fetchTimings(loc.lat, loc.lon, s.method, s.school);
       setData(d);
+      saveCachedData(d);
       setLocation(loc);
       saveLocation(loc);
       setStatus("idle");
@@ -289,6 +292,7 @@ function Results({
         data={data}
         now={now}
         h12={h12}
+        hijriOffset={settings.hijriOffset}
         locating={locating}
         onSearch={onSearch}
         onLocate={onLocate}
