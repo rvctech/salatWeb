@@ -3,7 +3,6 @@ import {
   PinIcon,
   SearchIcon,
   LocateIcon,
-  GearIcon,
   ClockIcon,
   CalendarIcon,
   SparkleIcon,
@@ -20,7 +19,6 @@ interface Props {
   locating: boolean;
   onSearch: () => void;
   onLocate: () => void;
-  onSettings: () => void;
 }
 
 function InfoTile({
@@ -70,7 +68,6 @@ export default function LocationBar({
   locating,
   onSearch,
   onLocate,
-  onSettings,
 }: Props) {
   const tz = data?.timezone;
   const clock = tz ? zonedClock(tz, now, h12) : "—";
@@ -117,9 +114,6 @@ export default function LocationBar({
             ) : (
               <LocateIcon className="h-4 w-4" />
             )}
-          </button>
-          <button onClick={onSettings} className={BTN} aria-label="Settings">
-            <GearIcon className="h-4 w-4" />
           </button>
         </div>
       </div>

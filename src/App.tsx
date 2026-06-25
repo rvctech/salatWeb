@@ -222,7 +222,6 @@ export default function App() {
         locating={locating}
         onSearch={() => setPanel("search")}
         onLocate={openLocate}
-        onSettings={() => setPanel("settings")}
       />
           )}
         </main>
@@ -261,7 +260,6 @@ function Results({
   locating,
   onSearch,
   onLocate,
-  onSettings,
 }: {
   data: PrayerData;
   location: LocationInfo;
@@ -271,7 +269,6 @@ function Results({
   locating: boolean;
   onSearch: () => void;
   onLocate: () => void;
-  onSettings: () => void;
 }) {
   const tz = data.timezone;
   const nowMs = zonedNowMs(tz, now);
@@ -299,7 +296,6 @@ function Results({
         locating={locating}
         onSearch={onSearch}
         onLocate={onLocate}
-        onSettings={onSettings}
       />
 
       <NextPrayer
