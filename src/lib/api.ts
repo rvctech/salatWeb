@@ -217,7 +217,12 @@ function hijriMonthLength(month: number, year: number): number {
 }
 
 function hijriToDays(day: number, month: number, year: number): number {
-  let days = (year - 1) * 354 + Math.floor((year - 1) / 30) * 11;
+  const CYCLE_DAYS = 19 * 354 + 11 * 355;
+  const cycles = Math.floor((year - 1) / 30);
+  let days = cycles * CYCLE_DAYS;
+  for (let y = 1; y <= (year - 1) % 30; y++) {
+    days += isHijriLeapYear(y) ? 355 : 354;
+  }
   for (let m = 1; m < month; m++) days += hijriMonthLength(m, year);
   return days + day;
 }
