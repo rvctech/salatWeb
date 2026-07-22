@@ -9,6 +9,7 @@ interface Props {
   time: string;
   status: CardStatus;
   index: number;
+  isTomorrow?: boolean;
 }
 
 const TILE: Record<CardStatus, string> = {
@@ -32,7 +33,7 @@ const BADGE: Record<CardStatus, { text: string; cls: string } | null> = {
   idle: null,
 };
 
-export default function PrayerCard({ item, time, status, index }: Props) {
+export default function PrayerCard({ item, time, status, index, isTomorrow }: Props) {
   const Icon = PRAYER_ICONS[item.key] ?? PRAYER_ICONS.Dhuhr;
   const badge = BADGE[status];
   return (
@@ -67,6 +68,11 @@ export default function PrayerCard({ item, time, status, index }: Props) {
             )}
           >
             {badge.text}
+          </span>
+        )}
+        {!badge && isTomorrow && (
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold tracking-widest text-cream/60">
+            TOMORROW
           </span>
         )}
       </div>

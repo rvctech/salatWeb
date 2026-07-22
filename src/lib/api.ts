@@ -1,12 +1,10 @@
-import type {
-  CalcMethod,
-  LocationInfo,
-  PlaceSuggestion,
-  PrayerData,
-} from "./types";
+import type { CalcMethod, PlaceSuggestion, PrayerData } from "./types";
 
 const ALADHAN = "https://api.aladhan.com/v1";
 const NOMINATIM = "https://nominatim.openstreetmap.org";
+
+const FETCH_TIMEOUT_MS = 15_000;
+const MAX_RETRIES = 2;
 
 /** Common calculation methods exposed by the Aladhan API. */
 export const PRAYER_METHODS: CalcMethod[] = [
@@ -25,265 +23,99 @@ export const PRAYER_METHODS: CalcMethod[] = [
 
 export const DEFAULT_METHOD = 3;
 
+export const THEMES = [
+  { id: "default", name: "Teal Night", bg: "#04161c", accent: "#1d8a82", gold: "#e9c97f" },
+  { id: "light", name: "Light", bg: "#f8f6f0", accent: "#2563eb", gold: "#b8860b" },
+  { id: "midnight", name: "Midnight Blue", bg: "#0a0e27", accent: "#60a5fa", gold: "#94a3b8" },
+  { id: "desert", name: "Desert Sand", bg: "#f5e6c8", accent: "#c2790a", gold: "#8b6914" },
+  { id: "purple", name: "Royal Purple", bg: "#1a0a2e", accent: "#a855f7", gold: "#e9c97f" },
+] as const;
+
+export type ThemeId = (typeof THEMES)[number]["id"];
+
+export interface Settings {
+  method: number;
+  school: number;
+  h12: boolean;
+  hijriOffset: number;
+  theme: ThemeId;
+}
+
 /* ------------------------------------------------------------------ *
- * Time helpers (timezone-aware)
+ * Re-exports — keep backward compatibility with existing imports
  * ------------------------------------------------------------------ */
 
-/** Pull the first HH:MM out of a string like "05:21" or "05:21 (EST)". */
-export function cleanTime(t: string): string {
-  const m = t.match(/\d{1,2}:\d{2}/);
-  return m ? m[0] : t;
-}
+export {
+  cleanTime,
+  parseHM,
+  getZonedParts,
+  zonedNowMs,
+  zonedPrayerMs,
+  formatHM,
+  zonedClock,
+  PRAYER_ORDER,
+  SALAH_ORDER,
+  getStatus,
+  countdown,
+} from "./time";
 
-export function parseHM(t: string): { h: number; m: number } {
-  const m = t.match(/(\d{1,2}):(\d{2})/);
-  if (!m) return { h: 0, m: 0 };
-  return { h: parseInt(m[1], 10) % 24, m: parseInt(m[2], 10) };
-}
+export type { OrderItem, StatusItem, Countdown } from "./time";
 
-interface ZonedParts {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-}
+export { adjustedHijri } from "./hijri";
+export { qiblaBearing, haversineKm, KAABA } from "./qibla";
 
-/** Wall-clock parts of an instant, expressed in the given IANA timezone. */
-export function getZonedParts(tz: string, d = new Date()): ZonedParts {
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz || undefined,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-  const parts = fmt.formatToParts(d);
-  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
-  let hour = parseInt(g("hour"), 10);
-  if (hour === 24) hour = 0;
-  return {
-    year: parseInt(g("year"), 10),
-    month: parseInt(g("month"), 10),
-    day: parseInt(g("day"), 10),
-    hour,
-    minute: parseInt(g("minute"), 10),
-    second: parseInt(g("second"), 10),
-  };
-}
-
-/** A comparable ms timestamp for "now" in the target timezone. */
-export function zonedNowMs(tz: string, epoch = Date.now()): number {
-  const p = getZonedParts(tz, new Date(epoch));
-  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
-}
-
-/** ms timestamp for a wall-clock prayer time (with optional day offset). */
-export function zonedPrayerMs(
-  tz: string,
-  h: number,
-  m: number,
-  dayOffset = 0,
-): number {
-  const p = getZonedParts(tz);
-  return Date.UTC(p.year, p.month - 1, p.day + dayOffset, h % 24, m, 0);
-}
-
-export function formatHM(h: number, m: number, h12: boolean): string {
-  const mm = String(m).padStart(2, "0");
-  if (h12) {
-    const period = h >= 12 ? "PM" : "AM";
-    let hr = h % 12;
-    if (hr === 0) hr = 12;
-    return `${hr}:${mm}\u00A0${period}`;
-  }
-  return `${String(h).padStart(2, "0")}:${mm}`;
-}
-
-export function zonedClock(
-  tz: string,
-  epoch = Date.now(),
-  h12: boolean,
-  withSeconds = true,
-): string {
-  const p = getZonedParts(tz, new Date(epoch));
-  const mm = String(p.minute).padStart(2, "0");
-  const ss = withSeconds ? `:${String(p.second).padStart(2, "0")}` : "";
-  if (h12) {
-    const period = p.hour >= 12 ? "PM" : "AM";
-    let hr = p.hour % 12;
-    if (hr === 0) hr = 12;
-    return `${hr}:${mm}${ss}\u00A0${period}`;
-  }
-  return `${String(p.hour).padStart(2, "0")}:${mm}${ss}`;
-}
+export {
+  loadLocation,
+  saveLocation,
+  loadSettings,
+  saveSettings,
+  loadCachedData,
+  saveCachedData,
+} from "./storage";
 
 /* ------------------------------------------------------------------ *
- * Prayer ordering / status
+ * Network helpers
  * ------------------------------------------------------------------ */
 
-export interface OrderItem {
-  key: string;
-  name: string;
-  arabic: string;
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
 }
 
-export const PRAYER_ORDER: OrderItem[] = [
-  { key: "Fajr", name: "Fajr", arabic: "الفجر" },
-  { key: "Sunrise", name: "Sunrise", arabic: "الشروق" },
-  { key: "Dhuhr", name: "Dhuhr", arabic: "الظهر" },
-  { key: "Asr", name: "Asr", arabic: "العصر" },
-  { key: "Maghrib", name: "Maghrib", arabic: "المغرب" },
-  { key: "Isha", name: "Isha", arabic: "العشاء" },
-];
-
-export const SALAH_ORDER: OrderItem[] = PRAYER_ORDER.filter(
-  (p) => p.key !== "Sunrise",
-);
-
-export interface StatusItem extends OrderItem {
-  h: number;
-  m: number;
-  ms: number;
-  dayOffset: number;
-}
-
-/** Returns the previous & next item in the daily cycle of `order`. */
-export function getStatus(
-  order: OrderItem[],
-  timings: Record<string, string>,
-  tz: string,
-  nowMs: number,
-): { next: StatusItem; prev: StatusItem } {
-  const def = (key: string, off: number): StatusItem => {
-    const base = order.find((o) => o.key === key)!;
-    const { h, m } = parseHM(timings[key] ?? "00:00");
-    return { ...base, h, m, ms: zonedPrayerMs(tz, h, m, off), dayOffset: off };
-  };
-
-  const first = order[0].key;
-  const last = order[order.length - 1].key;
-  const timeline: StatusItem[] = [
-    def(last, -1),
-    ...order.map((o) => def(o.key, 0)),
-    def(first, 1),
-  ];
-
-  let i = 0;
-  while (i < timeline.length && timeline[i].ms <= nowMs) i++;
-  const next = timeline[Math.min(i, timeline.length - 1)];
-  const prev = timeline[Math.max(i - 1, 0)];
-  return { next, prev };
-}
-
-export interface Countdown {
-  h: number;
-  m: number;
-  s: number;
-}
-
-export function countdown(ms: number): Countdown {
-  let t = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(t / 3600);
-  t -= h * 3600;
-  const m = Math.floor(t / 60);
-  const s = t - m * 60;
-  return { h, m, s };
+async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  retries = MAX_RETRIES,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, init);
+      if (res.ok) return res;
+      // Don't retry client errors (4xx)
+      if (res.status >= 400 && res.status < 500) return res;
+      lastError = new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      lastError = e;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 300 * 2 ** attempt));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Network request failed");
 }
 
 /* ------------------------------------------------------------------ *
- * Hijri date adjustment
- * ------------------------------------------------------------------ */
-
-const HIJRI_MONTH_DAYS = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
-const HIJRI_MONTH_NAMES = [
-  "Muharram", "Safar", "Rabi' I", "Rabi' II",
-  "Jumada I", "Jumada II", "Rajab", "Sha'ban",
-  "Ramadan", "Shawwal", "Dhu'l-Qi'dah", "Dhu'l-Hijjah",
-];
-
-function isHijriLeapYear(year: number): boolean {
-  const leaps = new Set([2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29]);
-  return leaps.has(year % 30);
-}
-
-function hijriMonthLength(month: number, year: number): number {
-  if (month === 12) return isHijriLeapYear(year) ? 30 : 29;
-  return HIJRI_MONTH_DAYS[month - 1];
-}
-
-function hijriToDays(day: number, month: number, year: number): number {
-  const CYCLE_DAYS = 19 * 354 + 11 * 355;
-  const cycles = Math.floor((year - 1) / 30);
-  let days = cycles * CYCLE_DAYS;
-  for (let y = 1; y <= (year - 1) % 30; y++) {
-    days += isHijriLeapYear(y) ? 355 : 354;
-  }
-  for (let m = 1; m < month; m++) days += hijriMonthLength(m, year);
-  return days + day;
-}
-
-function daysToHijri(total: number): { day: number; month: number; year: number } {
-  let year = 1;
-  while (true) {
-    const yrDays = isHijriLeapYear(year) ? 355 : 354;
-    if (total <= yrDays) break;
-    total -= yrDays;
-    year++;
-  }
-  let month = 1;
-  while (true) {
-    const mDays = hijriMonthLength(month, year);
-    if (total <= mDays) break;
-    total -= mDays;
-    month++;
-  }
-  return { day: total, month, year };
-}
-
-export function adjustedHijri(
-  dayStr: string,
-  monthEn: string,
-  yearStr: string,
-  offset: number,
-): string {
-  if (offset === 0) return `${dayStr} ${monthEn} ${yearStr}`;
-  const day = parseInt(dayStr, 10) || 1;
-  const year = parseInt(yearStr, 10) || 1446;
-  const monthIdx = HIJRI_MONTH_NAMES.indexOf(monthEn) + 1;
-  const month = monthIdx > 0 ? monthIdx : 1;
-  const total = hijriToDays(day, month, year) + offset;
-  if (total < 1) return "1 Muharram 1";
-  const adj = daysToHijri(total);
-  return `${adj.day} ${HIJRI_MONTH_NAMES[adj.month - 1]} ${adj.year}`;
-}
-
-/* ------------------------------------------------------------------ *
- * Qibla
- * ------------------------------------------------------------------ */
-
-export const KAABA = { lat: 21.4225, lon: 39.8262 };
-
-/** Initial bearing (degrees, clockwise from North) toward the Kaaba. */
-export function qiblaBearing(lat: number, lon: number): number {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const toDeg = (r: number) => (r * 180) / Math.PI;
-  const dLon = toRad(KAABA.lon - lon);
-  const lat1 = toRad(lat);
-  const lat2 = toRad(KAABA.lat);
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
-
-/* ------------------------------------------------------------------ *
- * Network
+ * API calls
  * ------------------------------------------------------------------ */
 
 export async function fetchTimings(
@@ -295,7 +127,7 @@ export async function fetchTimings(
   const url =
     `${ALADHAN}/timings?latitude=${lat}&longitude=${lon}` +
     `&method=${method}&school=${school}`;
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`Prayer service error (${res.status})`);
   const json = await res.json();
   const d = json?.data;
@@ -318,6 +150,14 @@ export async function fetchTimings(
     latitude: d.meta.latitude,
     longitude: d.meta.longitude,
   };
+}
+
+interface NominatimResult {
+  lat: string;
+  lon: string;
+  name?: string;
+  display_name?: string;
+  address?: Record<string, string>;
 }
 
 function shortLabel(addr: Record<string, string>): {
@@ -345,9 +185,11 @@ export async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
   const url =
     `${NOMINATIM}/search?format=jsonv2&addressdetails=1&limit=6` +
     `&accept-language=en&q=${q}`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  const res = await fetchWithRetry(url, {
+    headers: { Accept: "application/json" },
+  });
   if (!res.ok) throw new Error("Search failed");
-  const arr = (await res.json()) as any[];
+  const arr = (await res.json()) as NominatimResult[];
   return arr.map((r) => {
     const { label, sublabel } = shortLabel(r.address || {});
     const fallback =
@@ -355,7 +197,7 @@ export async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
     return {
       lat: parseFloat(r.lat),
       lon: parseFloat(r.lon),
-      label: label || r.name || fallback,
+      label: label || r.name || fallback || "Unknown",
       sublabel,
       raw: r.display_name || "",
     };
@@ -370,9 +212,9 @@ export async function reverseGeocode(
     `${NOMINATIM}/reverse?format=jsonv2&zoom=10` +
     `&accept-language=en&lat=${lat}&lon=${lon}`;
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) throw new Error("reverse failed");
-    const r = await res.json();
+    const r = (await res.json()) as NominatimResult;
     const { label, sublabel } = shortLabel(r.address || {});
     const fallback = r.display_name?.split(",").slice(0, 2).join(",").trim();
     return { label: label || fallback || "Current location", sublabel };
@@ -427,73 +269,4 @@ export function getGeolocation(): Promise<{ lat: number; lon: number }> {
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 },
     );
   });
-}
-
-/** Load + persist a single location summary in localStorage. */
-const LOC_KEY = "salat.location";
-const SET_KEY = "salat.settings";
-const CACHE_KEY = "salat.cache";
-
-export function loadLocation(): LocationInfo | null {
-  try {
-    const raw = localStorage.getItem(LOC_KEY);
-    return raw ? (JSON.parse(raw) as LocationInfo) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveLocation(loc: LocationInfo) {
-  try {
-    localStorage.setItem(LOC_KEY, JSON.stringify(loc));
-  } catch {
-    /* ignore */
-  }
-}
-
-export interface Settings {
-  method: number;
-  school: number;
-  h12: boolean;
-  hijriOffset: number;
-}
-
-export function loadSettings(): Settings {
-  const fallback: Settings = {
-    method: DEFAULT_METHOD,
-    school: 0,
-    h12: true,
-    hijriOffset: 0,
-  };
-  try {
-    const raw = localStorage.getItem(SET_KEY);
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-export function saveSettings(s: Settings) {
-  try {
-    localStorage.setItem(SET_KEY, JSON.stringify(s));
-  } catch {
-    /* ignore */
-  }
-}
-
-export function loadCachedData(): PrayerData | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as PrayerData) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveCachedData(d: PrayerData) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(d));
-  } catch {
-    /* ignore */
-  }
 }

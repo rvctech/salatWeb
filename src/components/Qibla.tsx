@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CompassIcon, KaabaIcon, LocateIcon } from "./Icons";
-import { KAABA } from "../lib/api";
+import { KAABA, haversineKm } from "../lib/qibla";
 
 interface Props {
   bearing: number;
@@ -8,15 +8,13 @@ interface Props {
   lon: number;
 }
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return Math.round(2 * R * Math.asin(Math.sqrt(a)));
+interface DeviceOrientationEventExt extends Event {
+  webkitCompassHeading?: number;
+  alpha?: number | null;
+}
+
+interface DeviceOrientationEventConstructor {
+  requestPermission?: () => Promise<string>;
 }
 
 const CARDINALS = [
@@ -32,19 +30,19 @@ export default function Qibla({ bearing, lat, lon }: Props) {
   const [heading, setHeading] = useState<number | null>(null);
   const [active, setActive] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const handlerRef = useRef<((e: any) => void) | null>(null);
+  const handlerRef = useRef<((e: DeviceOrientationEventExt) => void) | null>(null);
   const evtRef = useRef<string>("deviceorientation");
 
   useEffect(() => {
     return () => {
       if (handlerRef.current) {
-        window.removeEventListener(evtRef.current, handlerRef.current, true);
+        window.removeEventListener(evtRef.current, handlerRef.current as EventListener, true);
       }
     };
   }, []);
 
   async function enableCompass() {
-    const DOE = (window as any).DeviceOrientationEvent;
+    const DOE = window.DeviceOrientationEvent as DeviceOrientationEventConstructor | undefined;
     if (!DOE) {
       setStatus("Compass sensors aren't available on this device.");
       return;
@@ -57,8 +55,8 @@ export default function Qibla({ bearing, lat, lon }: Props) {
           return;
         }
       }
-      const handler = (e: any) => {
-        let h: number | null = e.webkitCompassHeading;
+      const handler = (e: DeviceOrientationEventExt) => {
+        let h: number | null = e.webkitCompassHeading ?? null;
         if (h == null && e.alpha != null) h = 360 - e.alpha;
         if (h != null && !Number.isNaN(h)) setHeading(h);
       };
@@ -67,7 +65,7 @@ export default function Qibla({ bearing, lat, lon }: Props) {
           ? "deviceorientationabsolute"
           : "deviceorientation";
       handlerRef.current = handler;
-      window.addEventListener(evtRef.current, handler, true);
+      window.addEventListener(evtRef.current, handler as EventListener, true);
       setActive(true);
       setStatus(
         "Hold your device flat and face forward — the Kaaba marks Qibla.",

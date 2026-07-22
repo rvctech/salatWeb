@@ -1,15 +1,111 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#04211f"/>
+      <stop offset="0%" stop-color="#062b28"/>
       <stop offset="100%" stop-color="#04161c"/>
     </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="#1d8a82" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#04161c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f3e2b6"/>
+      <stop offset="50%" stop-color="#e9c97f"/>
+      <stop offset="100%" stop-color="#c9a94e"/>
+    </linearGradient>
+    <linearGradient id="goldDark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e9c97f"/>
+      <stop offset="100%" stop-color="#a08030"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="innerShadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
   </defs>
+
+  <!-- Background -->
   <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-  <g transform="translate(128,128) scale(10.67)" fill="none" stroke="#e9c97f" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 3c2.5 2 4 4.6 4 7.5 0 .5 0 1-.1 1.5"/>
-    <path d="M4 21h16M6 21v-2a6 6 0 0 1 12 0v2"/>
-    <path d="M9 9.2A6 6 0 0 0 8 13v6M16 13v6"/>
-    <path d="M19.5 7.2a2.6 2.6 0 0 1-3 .2 2.7 2.7 0 0 1 2.3-4.6 3.8 3.8 0 0 0 .7 4.4Z"/>
+  <rect width="512" height="512" rx="96" fill="url(#glow)"/>
+
+  <!-- Subtle geometric pattern -->
+  <g opacity="0.04" stroke="#e9c97f" stroke-width="0.8" fill="none">
+    <circle cx="256" cy="256" r="180"/>
+    <circle cx="256" cy="256" r="140"/>
+    <circle cx="256" cy="256" r="100"/>
+    <line x1="256" y1="76" x2="256" y2="436"/>
+    <line x1="76" y1="256" x2="436" y2="256"/>
+    <line x1="128" y1="128" x2="384" y2="384"/>
+    <line x1="384" y1="128" x2="128" y2="384"/>
+  </g>
+
+  <!-- Mosque dome -->
+  <g filter="url(#innerShadow)">
+    <!-- Main dome body -->
+    <path d="M148 340 Q148 220 256 160 Q364 220 364 340 Z" fill="url(#gold)" opacity="0.9"/>
+    <!-- Dome highlight -->
+    <path d="M180 340 Q180 240 256 185 Q300 220 310 260 Q280 230 256 215 Q220 230 200 260 Q210 220 180 340 Z" fill="#f3e2b6" opacity="0.15"/>
+  </g>
+
+  <!-- Dome base / building -->
+  <rect x="148" y="336" width="216" height="40" rx="4" fill="url(#goldDark)" opacity="0.85"/>
+  <rect x="140" y="370" width="232" height="16" rx="3" fill="url(#goldDark)" opacity="0.7"/>
+
+  <!-- Door arch -->
+  <path d="M230 376 L230 340 Q256 320 282 340 L282 376 Z" fill="#04161c" opacity="0.5"/>
+
+  <!-- Crescent finial on dome -->
+  <g transform="translate(256, 148)" filter="url(#softGlow)">
+    <!-- Vertical spire -->
+    <line x1="0" y1="12" x2="0" y2="-8" stroke="url(#gold)" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Crescent -->
+    <circle cx="0" cy="-14" r="7" fill="url(#gold)"/>
+    <circle cx="2.5" cy="-15.5" r="5.5" fill="#04161c"/>
+  </g>
+
+  <!-- Left minaret -->
+  <g filter="url(#innerShadow)">
+    <rect x="112" y="260" width="28" height="126" rx="3" fill="url(#goldDark)" opacity="0.75"/>
+    <path d="M112 260 Q126 240 140 260 Z" fill="url(#gold)" opacity="0.8"/>
+    <circle cx="126" cy="248" r="4" fill="url(#gold)" opacity="0.9"/>
+    <line x1="126" y1="244" x2="126" y2="236" stroke="url(#gold)" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Crescent on left minaret -->
+    <circle cx="126" cy="233" r="3" fill="url(#gold)"/>
+    <circle cx="127.5" cy="232" r="2.3" fill="#04161c"/>
+    <!-- Balcony -->
+    <rect x="108" y="290" width="36" height="5" rx="2" fill="url(#goldDark)" opacity="0.6"/>
+  </g>
+
+  <!-- Right minaret -->
+  <g filter="url(#innerShadow)">
+    <rect x="372" y="260" width="28" height="126" rx="3" fill="url(#goldDark)" opacity="0.75"/>
+    <path d="M372 260 Q386 240 400 260 Z" fill="url(#gold)" opacity="0.8"/>
+    <circle cx="386" cy="248" r="4" fill="url(#gold)" opacity="0.9"/>
+    <line x1="386" y1="244" x2="386" y2="236" stroke="url(#gold)" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Crescent on right minaret -->
+    <circle cx="386" cy="233" r="3" fill="url(#gold)"/>
+    <circle cx="387.5" cy="232" r="2.3" fill="#04161c"/>
+    <!-- Balcony -->
+    <rect x="368" y="290" width="36" height="5" rx="2" fill="url(#goldDark)" opacity="0.6"/>
+  </g>
+
+  <!-- Ground line -->
+  <line x1="100" y1="390" x2="412" y2="390" stroke="#e9c97f" stroke-width="1" opacity="0.2"/>
+
+  <!-- Stars -->
+  <g fill="#e9c97f">
+    <circle cx="100" cy="110" r="1.5" opacity="0.5"/>
+    <circle cx="420" cy="90" r="1" opacity="0.4"/>
+    <circle cx="80" cy="180" r="1" opacity="0.3"/>
+    <circle cx="440" cy="170" r="1.5" opacity="0.45"/>
+    <circle cx="160" cy="80" r="1" opacity="0.35"/>
+    <circle cx="360" cy="70" r="1.2" opacity="0.4"/>
+    <circle cx="60" cy="140" r="0.8" opacity="0.25"/>
+    <circle cx="450" cy="130" r="0.8" opacity="0.3"/>
   </g>
 </svg>

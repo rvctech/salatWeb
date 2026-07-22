@@ -23,12 +23,12 @@ export default function Background() {
       aria-hidden
       className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
     >
-      {/* soft colour glows */}
+      {/* soft colour glows — use CSS variables from current theme */}
       <div
         className="absolute -right-32 -top-40 h-[36rem] w-[36rem] rounded-full blur-3xl"
         style={{
           background:
-            "radial-gradient(circle, rgba(29,138,130,0.55), transparent 62%)",
+            "radial-gradient(circle, var(--color-glow-1), transparent 62%)",
           animation: "glowPulse 12s ease-in-out infinite",
         }}
       />
@@ -36,15 +36,15 @@ export default function Background() {
         className="absolute -left-40 top-1/3 h-[30rem] w-[30rem] rounded-full blur-3xl"
         style={{
           background:
-            "radial-gradient(circle, rgba(233,201,127,0.16), transparent 60%)",
+            "radial-gradient(circle, var(--color-glow-2), transparent 60%)",
           animation: "glowPulse 16s ease-in-out infinite",
         }}
       />
 
       {/* geometric islamic lattice */}
       <svg
-        className="absolute inset-0 h-full w-full text-gold"
-        style={{ opacity: 0.05 }}
+        className="absolute inset-0 h-full w-full"
+        style={{ opacity: 0.05, color: "var(--color-gold)" }}
         preserveAspectRatio="xMidYMid slice"
       >
         <defs>
@@ -75,12 +75,13 @@ export default function Background() {
       {stars.map((s, i) => (
         <span
           key={i}
-          className="absolute rounded-full bg-cream"
+          className="absolute rounded-full"
           style={{
             top: s.top,
             left: s.left,
             width: s.size,
             height: s.size,
+            backgroundColor: "var(--color-cream)",
             opacity: Number(s.op),
             animation: `twinkle ${s.dur} ease-in-out ${s.delay} infinite`,
           }}
@@ -92,7 +93,7 @@ export default function Background() {
         className="absolute inset-x-0 bottom-0 h-64"
         style={{
           background:
-            "linear-gradient(180deg, transparent, rgba(4,16,20,0.9))",
+            "linear-gradient(180deg, transparent, var(--color-vignette))",
         }}
       />
     </div>

@@ -6,6 +6,7 @@ interface Props {
   formattedTime: string;
   remaining: Countdown;
   progress: number;
+  isTomorrow?: boolean;
 }
 
 function pad(n: number) {
@@ -17,6 +18,7 @@ export default function NextPrayer({
   formattedTime,
   remaining,
   progress,
+  isTomorrow,
 }: Props) {
   const Icon = PRAYER_ICONS[next.key] ?? PRAYER_ICONS.Dhuhr;
   return (
@@ -43,7 +45,7 @@ export default function NextPrayer({
           </span>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold/80">
-              Up next
+              Up next{isTomorrow ? " — Tomorrow" : ""}
             </p>
             <h2 className="font-display text-3xl font-bold text-cream sm:text-4xl">
               {next.name}
@@ -59,7 +61,7 @@ export default function NextPrayer({
         </div>
 
         {/* right: countdown */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3" aria-live="polite" aria-atomic="true">
           <Unit value={pad(remaining.h)} label="Hours" />
           <Colon />
           <Unit value={pad(remaining.m)} label="Min" />

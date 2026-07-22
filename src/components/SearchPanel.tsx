@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import Modal from "./Modal";
 import { SearchIcon, LocateIcon, PinIcon } from "./Icons";
 import { searchPlaces } from "../lib/api";
@@ -22,56 +22,98 @@ interface Props {
   onUseLocation: () => void;
 }
 
+interface SearchState {
+  items: PlaceSuggestion[];
+  loading: boolean;
+  error: string | null;
+}
+
+type SearchAction =
+  | { type: "reset" }
+  | { type: "loading" }
+  | { type: "results"; items: PlaceSuggestion[] }
+  | { type: "error"; message: string };
+
+function searchReducer(_state: SearchState, action: SearchAction): SearchState {
+  switch (action.type) {
+    case "reset":
+      return { items: [], loading: false, error: null };
+    case "loading":
+      return { items: [], loading: true, error: null };
+    case "results":
+      return { items: action.items, loading: false, error: null };
+    case "error":
+      return { items: [], loading: false, error: action.message };
+  }
+}
+
 export default function SearchPanel({
   open,
   onClose,
   onSelect,
   onUseLocation,
 }: Props) {
+  return open ? (
+    <SearchPanelInner
+      onClose={onClose}
+      onSelect={onSelect}
+      onUseLocation={onUseLocation}
+    />
+  ) : null;
+}
+
+function SearchPanelInner({
+  onClose,
+  onSelect,
+  onUseLocation,
+}: Omit<Props, "open">) {
   const [q, setQ] = useState("");
-  const [items, setItems] = useState<PlaceSuggestion[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(searchReducer, {
+    items: [],
+    loading: false,
+    error: null,
+  });
   const [active, setActive] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const reqId = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (open) {
-      setQ("");
-      setItems([]);
-      setError(null);
-      const t = setTimeout(() => inputRef.current?.focus(), 60);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
+    const t = setTimeout(() => inputRef.current?.focus(), 60);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
-    if (q.trim().length < 3) {
-      setItems([]);
-      setError(null);
-      setLoading(false);
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const debouncedQ = useDebouncedValue(q, 400);
+
+  useEffect(() => {
+    if (debouncedQ.trim().length < 3) {
+      dispatch({ type: "reset" });
       return;
     }
-    setLoading(true);
-    setError(null);
+    dispatch({ type: "loading" });
     const id = ++reqId.current;
-    const t = setTimeout(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    (async () => {
       try {
-        const res = await searchPlaces(q);
-        if (reqId.current === id) {
-          setItems(res);
+        const res = await searchPlaces(debouncedQ);
+        if (reqId.current === id && !controller.signal.aborted) {
+          dispatch({ type: "results", items: res });
           setActive(-1);
         }
       } catch {
-        if (reqId.current === id)
-          setError("Couldn't search places. Check your connection and retry.");
-      } finally {
-        if (reqId.current === id) setLoading(false);
+        if (reqId.current === id && !controller.signal.aborted)
+          dispatch({ type: "error", message: "Couldn't search places. Check your connection and retry." });
       }
-    }, 400);
-    return () => clearTimeout(t);
-  }, [q]);
+    })();
+  }, [debouncedQ]);
 
   function build(it: PlaceSuggestion): LocationInfo {
     return {
@@ -84,16 +126,16 @@ export default function SearchPanel({
   }
 
   function onKey(e: React.KeyboardEvent) {
-    if (!items.length) return;
+    if (!state.items.length) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, items.length - 1));
+      setActive((a) => Math.min(a + 1, state.items.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter" && active >= 0) {
       e.preventDefault();
-      const it = items[active];
+      const it = state.items[active];
       if (it) onSelect(build(it));
     }
   }
@@ -102,7 +144,7 @@ export default function SearchPanel({
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title="Find a location"
       icon={<SearchIcon className="h-5 w-5 text-gold" />}
@@ -120,27 +162,27 @@ export default function SearchPanel({
       </div>
 
       <div className="mt-4 max-h-[22rem] overflow-y-auto pr-1">
-        {error && (
+        {state.error && (
           <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200">
-            {error}
+            {state.error}
           </p>
         )}
 
-        {loading && (
+        {state.loading && (
           <div className="flex items-center gap-3 px-2 py-3 text-sm text-cream/50">
             <Spinner /> Searching…
           </div>
         )}
 
-        {!loading && !showQuick && items.length === 0 && !error && (
+        {!state.loading && !showQuick && state.items.length === 0 && !state.error && (
           <p className="px-2 py-6 text-center text-sm text-cream/45">
             No matches. Try a different spelling or city.
           </p>
         )}
 
-        {!loading && items.length > 0 && (
+        {!state.loading && state.items.length > 0 && (
           <ul className="space-y-1">
-            {items.map((it, i) => (
+            {state.items.map((it, i) => (
               <li key={`${it.lat},${it.lon}-${i}`}>
                 <button
                   onMouseEnter={() => setActive(i)}
@@ -206,6 +248,19 @@ export default function SearchPanel({
       </div>
     </Modal>
   );
+}
+
+function useDebouncedValue(value: string, delayMs: number): string {
+  const [debounced, setDebounced] = useState(value);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timeoutRef.current);
+  }, [value, delayMs]);
+
+  return debounced;
 }
 
 function Spinner() {

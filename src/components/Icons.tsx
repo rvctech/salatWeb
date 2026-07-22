@@ -198,6 +198,7 @@ export function KaabaIcon(props: IconProps) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const PRAYER_ICONS: Record<string, (p: IconProps) => ReactElement> = {
   Fajr: FajrIcon,
   Sunrise: SunriseIcon,

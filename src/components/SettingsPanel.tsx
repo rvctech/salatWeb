@@ -1,7 +1,7 @@
 import Modal from "./Modal";
 import { GearIcon } from "./Icons";
-import { PRAYER_METHODS } from "../lib/api";
-import type { Settings } from "../lib/api";
+import { PRAYER_METHODS, THEMES } from "../lib/api";
+import type { Settings, ThemeId } from "../lib/api";
 
 interface Props {
   open: boolean;
@@ -57,6 +57,40 @@ export default function SettingsPanel({
       icon={<GearIcon className="h-5 w-5 text-gold" />}
     >
       <div className="space-y-5">
+        {/* Theme selector */}
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/50">
+            Theme
+          </label>
+          <div className="grid grid-cols-5 gap-2">
+            {THEMES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onChange({ ...settings, theme: t.id as ThemeId })}
+                className={`group flex flex-col items-center gap-1.5 rounded-xl border p-2 transition ${
+                  settings.theme === t.id
+                    ? "border-gold/60 bg-gold/10"
+                    : "border-white/8 hover:border-white/20 hover:bg-white/5"
+                }`}
+              >
+                <span
+                  className={`h-8 w-8 rounded-full ring-2 transition ${
+                    settings.theme === t.id
+                      ? "ring-gold ring-offset-2 ring-offset-deep"
+                      : "ring-white/10 group-hover:ring-white/25"
+                  }`}
+                  style={{
+                    background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)`,
+                  }}
+                />
+                <span className="text-[10px] font-medium text-cream/60 leading-tight text-center">
+                  {t.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div>
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/50">
             Calculation method
@@ -67,7 +101,7 @@ export default function SettingsPanel({
               onChange={(e) =>
                 onChange({ ...settings, method: Number(e.target.value) })
               }
-              style={{ colorScheme: "dark" }}
+              style={{ colorScheme: "var(--color-scheme)" }}
               className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 pr-10 text-cream outline-none transition focus:border-gold/50"
             >
               {PRAYER_METHODS.map((m) => (
