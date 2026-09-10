@@ -43,7 +43,7 @@ function InfoTile({
           {label}
         </p>
         <p
-          className={`truncate font-display text-[15px] font-semibold leading-tight sm:text-base ${
+          className={`break-words font-display text-[15px] font-semibold leading-snug sm:text-base ${
             gold ? "text-gold" : "text-cream"
           }`}
         >
