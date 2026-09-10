@@ -2,7 +2,9 @@
 
 A beautiful prayer-times PWA with live next-prayer countdown, Hijri date, Qibla compass, monthly timetable, and prayer alerts.
 
-![Built with React + Vite + Tailwind](https://img.shields.io/badge/React_19-Vite_7-Tailwind_4-teal)
+![React 19](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![Vite 7](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)
+![Tailwind CSS v4](https://img.shields.io/badge/tailwindcss-%2338BDF8.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
 ## ✨ Features
 
