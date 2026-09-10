@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import {
   PinIcon,
-  SearchIcon,
-  LocateIcon,
   ClockIcon,
   CalendarIcon,
   SparkleIcon,
@@ -16,9 +14,6 @@ interface Props {
   now: number;
   h12: boolean;
   hijriOffset: number;
-  locating: boolean;
-  onSearch: () => void;
-  onLocate: () => void;
 }
 
 function InfoTile({
@@ -27,37 +22,40 @@ function InfoTile({
   value,
   sub,
   gold,
+  className = "",
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   sub?: string;
   gold?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 text-gold/80 ring-1 ring-white/8">
+    <div
+      className={`flex min-w-0 items-center gap-2.5 rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3 ${className}`}
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-glass-bg)] text-gold/80 ring-1 ring-[var(--color-glass-border)] sm:h-9 sm:w-9">
         {icon}
       </span>
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider text-cream/40">
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-cream/60 sm:text-[11px]">
           {label}
         </p>
         <p
-          className={`truncate font-display font-semibold ${
+          className={`truncate font-display text-[15px] font-semibold leading-tight sm:text-base ${
             gold ? "text-gold" : "text-cream"
           }`}
         >
           {value}
         </p>
-        {sub && <p className="truncate text-xs text-cream/40">{sub}</p>}
+        {sub && (
+          <p className="truncate text-[11px] text-cream/60 sm:text-xs">{sub}</p>
+        )}
       </div>
     </div>
   );
 }
-
-const BTN =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-white/12 bg-white/5 px-3.5 py-2 text-sm font-medium text-cream/80 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold active:scale-95";
 
 export default function LocationBar({
   location,
@@ -65,60 +63,34 @@ export default function LocationBar({
   now,
   h12,
   hijriOffset = 0,
-  locating,
-  onSearch,
-  onLocate,
 }: Props) {
   const tz = data?.timezone;
   const clock = tz ? zonedClock(tz, now, h12) : "—";
 
   return (
-    <section className="animate-fadeUp rounded-3xl border border-white/10 glass p-5 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gold/10 text-gold ring-1 ring-gold/30">
-            <PinIcon className="h-6 w-6" />
-          </span>
-          <div className="min-w-0">
-            <h1 className="truncate font-display text-xl font-bold text-cream sm:text-2xl">
-              {location?.label ?? "—"}
-            </h1>
-            {location?.sublabel ? (
-              <p className="truncate text-sm text-cream/50">
-                {location.sublabel}
-              </p>
-            ) : (
-              <p className="text-sm text-cream/40">
-                {location?.source === "geo" ? "Detected location" : "Saved location"}
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button onClick={onSearch} className={BTN} aria-label="Search location">
-            <SearchIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">Search</span>
-          </button>
-          <button
-            onClick={onLocate}
-            className={BTN}
-            aria-label="Use my location"
-            disabled={locating}
-          >
-            {locating ? (
-              <span
-                className="h-4 w-4 animate-spin rounded-full border-2 border-cream/30 border-t-gold"
-                style={{ animationDuration: "0.7s" }}
-              />
-            ) : (
-              <LocateIcon className="h-4 w-4" />
-            )}
-          </button>
+    <section className="animate-fadeUp rounded-3xl border border-[var(--color-glass-border)] glass p-4 sm:p-6">
+      {/* Display-only: Search / Locate live in the sticky header. */}
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gold/10 text-gold ring-1 ring-gold/30 sm:h-12 sm:w-12">
+          <PinIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="truncate font-display text-lg font-bold text-cream sm:text-2xl">
+            {location?.label ?? "—"}
+          </h1>
+          {location?.sublabel ? (
+            <p className="truncate text-[13px] text-cream/60 sm:text-sm">
+              {location.sublabel}
+            </p>
+          ) : (
+            <p className="text-[13px] text-cream/60 sm:text-sm">
+              {location?.source === "geo" ? "Detected location" : "Saved location"}
+            </p>
+          )}
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-3 sm:gap-3">
         <InfoTile
           icon={<ClockIcon className="h-4 w-4" />}
           label="Local time"
@@ -145,6 +117,7 @@ export default function LocationBar({
           label="Gregorian"
           value={data?.weekday ?? "—"}
           sub={data?.gregorian}
+          className="col-span-2 sm:col-span-1"
         />
       </div>
     </section>

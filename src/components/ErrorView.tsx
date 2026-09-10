@@ -15,7 +15,7 @@ export default function ErrorView({
 }: Props) {
   return (
     <div className="animate-fadeUp mx-auto flex max-w-lg flex-col items-center pt-12 text-center">
-      <span className="flex h-16 w-16 items-center justify-center rounded-3xl bg-red-500/10 text-red-300 ring-1 ring-red-400/30">
+      <span className="flex h-16 w-16 items-center justify-center rounded-3xl bg-danger-soft text-danger ring-1 ring-red-400/30">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -31,7 +31,7 @@ export default function ErrorView({
       <h2 className="mt-5 font-display text-2xl font-bold text-cream">
         Couldn't load times
       </h2>
-      <p className="mt-2 max-w-sm text-cream/55">{message}</p>
+      <p className="mt-2 max-w-sm text-cream/70">{message}</p>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <button
           onClick={onRetry}
@@ -47,7 +47,7 @@ export default function ErrorView({
         </button>
         <button
           onClick={onSearch}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 font-semibold text-cream transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-5 py-3 font-semibold text-cream transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
         >
           <SearchIcon className="h-5 w-5" />
           Search a city

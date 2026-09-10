@@ -71,22 +71,24 @@ export default function Background() {
         <rect width="100%" height="100%" fill="url(#khatim)" />
       </svg>
 
-      {/* twinkling stars */}
-      {stars.map((s, i) => (
-        <span
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            top: s.top,
-            left: s.left,
-            width: s.size,
-            height: s.size,
-            backgroundColor: "var(--color-cream)",
-            opacity: Number(s.op),
-            animation: `twinkle ${s.dur} ease-in-out ${s.delay} infinite`,
-          }}
-        />
-      ))}
+      {/* twinkling stars — hidden on light themes via CSS (would read as dirt) */}
+      <div data-stars className="absolute inset-0">
+        {stars.map((s, i) => (
+          <span
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              top: s.top,
+              left: s.left,
+              width: s.size,
+              height: s.size,
+              backgroundColor: "var(--color-cream)",
+              opacity: Number(s.op),
+              animation: `twinkle ${s.dur} ease-in-out ${s.delay} infinite`,
+            }}
+          />
+        ))}
+      </div>
 
       {/* bottom vignette */}
       <div

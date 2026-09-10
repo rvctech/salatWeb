@@ -40,7 +40,7 @@ export default function Toast({ message, onDismiss, durationMs = 6000 }: Props) 
           : "translate-y-4 opacity-0 pointer-events-none"
       }`}
     >
-      <div className="flex items-center gap-3 rounded-2xl border border-white/12 glass-strong px-5 py-3 shadow-2xl">
+      <div className="flex items-center gap-3 rounded-2xl border border-[var(--color-glass-border)] glass-strong px-5 py-3 shadow-2xl">
         <p className="max-w-xs text-sm text-cream/80">{message}</p>
         <button
           onClick={() => {
@@ -48,7 +48,7 @@ export default function Toast({ message, onDismiss, durationMs = 6000 }: Props) 
             setVisible(false);
             setTimeout(onDismiss, 300);
           }}
-          className="ml-2 shrink-0 rounded-full p-1 text-cream/50 transition hover:bg-white/10 hover:text-cream"
+          className="ml-2 shrink-0 rounded-full p-1 text-cream/60 transition hover:bg-cream/10 hover:text-cream"
           aria-label="Dismiss"
         >
           <CloseIcon className="h-4 w-4" />

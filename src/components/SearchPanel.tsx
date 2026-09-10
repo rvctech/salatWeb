@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import Modal from "./Modal";
-import { SearchIcon, LocateIcon, PinIcon } from "./Icons";
-import { searchPlaces } from "../lib/api";
+import { SearchIcon, LocateIcon, PinIcon, CloseIcon, HistoryIcon } from "./Icons";
+import { searchPlaces, loadRecents, saveRecent, clearRecents } from "../lib/api";
 import type { LocationInfo, PlaceSuggestion } from "../lib/types";
 
 const QUICK: { name: string; lat: number; lon: number }[] = [
@@ -74,8 +74,8 @@ function SearchPanelInner({
     error: null,
   });
   const [active, setActive] = useState(-1);
+  const [recents, setRecents] = useState<LocationInfo[]>(() => loadRecents());
   const inputRef = useRef<HTMLInputElement>(null);
-  const reqId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -93,26 +93,34 @@ function SearchPanelInner({
 
   useEffect(() => {
     if (debouncedQ.trim().length < 3) {
+      abortRef.current?.abort();
       dispatch({ type: "reset" });
       return;
     }
     dispatch({ type: "loading" });
-    const id = ++reqId.current;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    let cancelled = false;
     (async () => {
       try {
-        const res = await searchPlaces(debouncedQ);
-        if (reqId.current === id && !controller.signal.aborted) {
+        const res = await searchPlaces(debouncedQ, {
+          signal: controller.signal,
+        });
+        if (!cancelled) {
           dispatch({ type: "results", items: res });
           setActive(-1);
         }
-      } catch {
-        if (reqId.current === id && !controller.signal.aborted)
-          dispatch({ type: "error", message: "Couldn't search places. Check your connection and retry." });
+      } catch (e) {
+        if (cancelled || controller.signal.aborted) return;
+        const msg =
+          e instanceof Error ? e.message : "Couldn't search places.";
+        dispatch({ type: "error", message: msg });
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedQ]);
 
   function build(it: PlaceSuggestion): LocationInfo {
@@ -125,7 +133,23 @@ function SearchPanelInner({
     };
   }
 
+  function handleSelect(loc: LocationInfo) {
+    saveRecent(loc);
+    setRecents(loadRecents());
+    onSelect(loc);
+  }
+
+  function handleClearRecents() {
+    clearRecents();
+    setRecents([]);
+  }
+
   function onKey(e: React.KeyboardEvent) {
+    if (e.key === "Escape" && q) {
+      e.stopPropagation();
+      setQ("");
+      return;
+    }
     if (!state.items.length) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -136,7 +160,7 @@ function SearchPanelInner({
     } else if (e.key === "Enter" && active >= 0) {
       e.preventDefault();
       const it = state.items[active];
-      if (it) onSelect(build(it));
+      if (it) handleSelect(build(it));
     }
   }
 
@@ -150,48 +174,72 @@ function SearchPanelInner({
       icon={<SearchIcon className="h-5 w-5 text-gold" />}
     >
       <div className="relative">
-        <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-cream/40" />
+        <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-cream/60" />
         <input
           ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKey}
           placeholder="Search a city, area or address…"
-          className="w-full rounded-2xl border border-white/10 bg-white/5 py-3 pl-11 pr-4 text-cream placeholder:text-cream/35 outline-none transition focus:border-gold/50 focus:bg-white/[0.07]"
+          role="combobox"
+          aria-expanded={state.items.length > 0}
+          aria-controls="search-results"
+          aria-activedescendant={active >= 0 ? `search-item-${active}` : undefined}
+          className="w-full rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] py-3 pl-11 pr-11 text-cream placeholder:text-cream/60 outline-none transition focus:border-gold/50"
         />
+        {q && (
+          <button
+            onClick={() => {
+              setQ("");
+              inputRef.current?.focus();
+            }}
+            aria-label="Clear search"
+            className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-cream/60 transition hover:bg-cream/10 hover:text-cream"
+          >
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        )}
       </div>
+      <p className="mt-2 px-1 text-[11px] text-cream/40">
+        Type 3+ letters · <kbd className="rounded bg-cream/10 px-1">↑↓</kbd>{" "}
+        navigate · <kbd className="rounded bg-cream/10 px-1">Enter</kbd> select
+        · <kbd className="rounded bg-cream/10 px-1">Esc</kbd> clear
+      </p>
 
       <div className="mt-4 max-h-[22rem] overflow-y-auto pr-1">
         {state.error && (
-          <p className="rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          <p className="rounded-xl bg-danger-soft px-3 py-2 text-sm text-danger">
             {state.error}
           </p>
         )}
 
         {state.loading && (
-          <div className="flex items-center gap-3 px-2 py-3 text-sm text-cream/50">
+          <div className="flex items-center gap-3 px-2 py-3 text-sm text-cream/60">
             <Spinner /> Searching…
           </div>
         )}
 
         {!state.loading && !showQuick && state.items.length === 0 && !state.error && (
-          <p className="px-2 py-6 text-center text-sm text-cream/45">
+          <p className="px-2 py-6 text-center text-sm text-cream/60">
             No matches. Try a different spelling or city.
           </p>
         )}
 
         {!state.loading && state.items.length > 0 && (
-          <ul className="space-y-1">
+          <ul id="search-results" role="listbox" className="space-y-1">
             {state.items.map((it, i) => (
               <li key={`${it.lat},${it.lon}-${i}`}>
                 <button
+                  id={`search-item-${i}`}
+                  role="option"
+                  aria-selected={active === i}
                   onMouseEnter={() => setActive(i)}
-                  onClick={() => onSelect(build(it))}
+                  onClick={() => handleSelect(build(it))}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                    active === i ? "bg-gold/15" : "hover:bg-white/5"
+                    active === i ? "bg-gold/15" : "hover:bg-cream/5"
                   }`}
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 text-gold/80 ring-1 ring-white/10">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-glass-bg)] text-gold/80 ring-1 ring-[var(--color-glass-border)]">
                     <PinIcon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0">
@@ -199,7 +247,7 @@ function SearchPanelInner({
                       {it.label}
                     </span>
                     {it.sublabel && (
-                      <span className="block truncate text-xs text-cream/45">
+                      <span className="block truncate text-xs text-cream/60">
                         {it.sublabel}
                       </span>
                     )}
@@ -211,33 +259,74 @@ function SearchPanelInner({
         )}
 
         {showQuick && (
-          <div>
-            <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-cream/40">
-              Popular cities
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {QUICK.map((c) => (
-                <button
-                  key={c.name}
-                  onClick={() =>
-                    onSelect({
-                      lat: c.lat,
-                      lon: c.lon,
-                      label: c.name,
-                      source: "search",
-                    })
-                  }
-                  className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5 text-left text-sm font-medium text-cream/80 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
-                >
-                  {c.name}
-                </button>
-              ))}
+          <div className="space-y-4">
+            {recents.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-cream/60">
+                    <HistoryIcon className="h-3.5 w-3.5" /> Recent
+                  </p>
+                  <button
+                    onClick={handleClearRecents}
+                    className="text-xs text-cream/60 transition hover:text-cream"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <ul className="space-y-1">
+                  {recents.map((r, i) => (
+                    <li key={`${r.lat},${r.lon}-${i}`}>
+                      <button
+                        onClick={() => handleSelect(r)}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-cream/5"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-glass-bg)] text-gold/80 ring-1 ring-[var(--color-glass-border)]">
+                          <HistoryIcon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-cream">
+                            {r.label}
+                          </span>
+                          {r.sublabel && (
+                            <span className="block truncate text-xs text-cream/60">
+                              {r.sublabel}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div>
+              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-cream/60">
+                Popular cities
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {QUICK.map((c) => (
+                  <button
+                    key={c.name}
+                    onClick={() =>
+                      handleSelect({
+                        lat: c.lat,
+                        lon: c.lon,
+                        label: c.name,
+                        source: "search",
+                      })
+                    }
+                    className="rounded-xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-3 py-2.5 text-left text-sm font-medium text-cream/80 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="mt-4 border-t border-white/8 pt-4">
+      <div className="mt-4 border-t border-[var(--color-glass-border)] pt-4">
         <button
           onClick={onUseLocation}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-gold to-gold-soft py-3 font-semibold text-night transition hover:brightness-105 active:scale-[0.98]"

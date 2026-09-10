@@ -68,16 +68,16 @@ html *::after {
   --color-surface: rgba(255, 255, 255, 0.05);
   --color-surface-strong: rgba(17, 22, 64, 0.8);
   --color-tealglow: #60a5fa;
-  --color-gold: #94a3b8;
-  --color-gold-soft: #cbd5e1;
+  --color-gold: #e9c97f;
+  --color-gold-soft: #f3e2b6;
   --color-cream: #e2e8f0;
   --color-accent: #60a5fa;
   --color-accent-rgb: 96, 165, 250;
-  --color-gold-rgb: 148, 163, 184;
+  --color-gold-rgb: 233, 201, 127;
   --color-body-bg: #0a0e27;
   --color-body-gradient: linear-gradient(180deg, #111640 0%, #0d1133 38%, #0a0e27 100%);
   --color-glow-1: rgba(96, 165, 250, 0.3);
-  --color-glow-2: rgba(148, 163, 184, 0.1);
+  --color-glow-2: rgba(233, 201, 127, 0.1);
   --color-vignette: rgba(10, 14, 39, 0.9);
   --color-glass-border: rgba(255, 255, 255, 0.08);
   --color-glass-bg: rgba(255, 255, 255, 0.04);
@@ -315,6 +315,46 @@ body {
   font-feature-settings: "tnum";
 }
 
+/* ---------- Theme-aware surfaces (work in dark AND light themes) ---------- */
+.surface {
+  background: var(--color-glass-bg);
+  border-color: var(--color-glass-border);
+}
+.surface-strong {
+  background: var(--color-glass-bg-strong);
+  border-color: var(--color-glass-border);
+}
+.track {
+  background: color-mix(in srgb, var(--color-cream) 12%, transparent);
+}
+
+/* Stars look like dirt on bright backgrounds — night skies only. */
+[data-theme="light"] [data-stars],
+[data-theme="desert"] [data-stars] {
+  display: none;
+}
+
+/* Danger text: soft red on dark themes, deep red on light themes. */
+.text-danger {
+  color: #fca5a5;
+}
+[data-theme="light"] .text-danger,
+[data-theme="desert"] .text-danger {
+  color: #b91c1c;
+}
+.bg-danger-soft {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Bright readable accent on dark themes, deep accent on light themes. */
+.text-accent-strong {
+  color: #99f6e4;
+}
+[data-theme="light"] .text-accent-strong,
+[data-theme="desert"] .text-accent-strong {
+  color: var(--color-accent);
+}
+
 /* ---------- Scrollbar ---------- */
 ::-webkit-scrollbar {
   width: 10px;
@@ -334,4 +374,28 @@ body {
 ::selection {
   background: rgba(var(--color-gold-rgb), 0.3);
   color: #fff;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html *,
+  html *::before,
+  html *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-floaty,
+  .animate-spinSlow,
+  .topbar-fill,
+  .shimmer-text {
+    animation: none !important;
+  }
+}
+
+/* ---------- Focus visibility ---------- */
+:where(button, a, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }

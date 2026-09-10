@@ -26,12 +26,14 @@ export const DEFAULT_METHOD = 3;
 export const THEMES = [
   { id: "default", name: "Teal Night", bg: "#04161c", accent: "#1d8a82", gold: "#e9c97f" },
   { id: "light", name: "Light", bg: "#f8f6f0", accent: "#2563eb", gold: "#b8860b" },
-  { id: "midnight", name: "Midnight Blue", bg: "#0a0e27", accent: "#60a5fa", gold: "#94a3b8" },
+  { id: "midnight", name: "Midnight Blue", bg: "#0a0e27", accent: "#60a5fa", gold: "#e9c97f" },
   { id: "desert", name: "Desert Sand", bg: "#f5e6c8", accent: "#c2790a", gold: "#8b6914" },
   { id: "purple", name: "Royal Purple", bg: "#1a0a2e", accent: "#a855f7", gold: "#e9c97f" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
+
+export type AlertSound = "ping" | "adhan";
 
 export interface Settings {
   method: number;
@@ -39,6 +41,7 @@ export interface Settings {
   h12: boolean;
   hijriOffset: number;
   theme: ThemeId;
+  alertSound: AlertSound;
 }
 
 /* ------------------------------------------------------------------ *
@@ -71,6 +74,11 @@ export {
   saveSettings,
   loadCachedData,
   saveCachedData,
+  loadCacheTime,
+  formatCacheAge,
+  loadRecents,
+  saveRecent,
+  clearRecents,
 } from "./storage";
 
 /* ------------------------------------------------------------------ *
@@ -83,11 +91,20 @@ async function fetchWithTimeout(
   timeoutMs = FETCH_TIMEOUT_MS,
 ): Promise<Response> {
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
+  const id = setTimeout(
+    () => controller.abort(new DOMException("Timeout", "TimeoutError")),
+    timeoutMs,
+  );
+  const onExternalAbort = () =>
+    controller.abort(
+      init?.signal?.reason ?? new DOMException("Aborted", "AbortError"),
+    );
+  init?.signal?.addEventListener("abort", onExternalAbort, { once: true });
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(id);
+    init?.signal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
@@ -123,9 +140,17 @@ export async function fetchTimings(
   lon: number,
   method: number,
   school: number,
+  date?: Date,
 ): Promise<PrayerData> {
+  let path = "timings";
+  if (date) {
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    path = `timings/${dd}-${mm}-${yyyy}`;
+  }
   const url =
-    `${ALADHAN}/timings?latitude=${lat}&longitude=${lon}` +
+    `${ALADHAN}/${path}?latitude=${lat}&longitude=${lon}` +
     `&method=${method}&school=${school}`;
   const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`Prayer service error (${res.status})`);
@@ -150,6 +175,85 @@ export async function fetchTimings(
     latitude: d.meta.latitude,
     longitude: d.meta.longitude,
   };
+}
+
+export interface MonthDay {
+  dayNum: number;
+  weekday: string;
+  gregorian: string;
+  hijri: string;
+  timings: Record<string, string>;
+}
+
+// In-memory month cache so background prefetch serves MonthPanel instantly.
+const monthCache = new Map<string, MonthDay[]>();
+
+function monthKey(
+  lat: number,
+  lon: number,
+  method: number,
+  school: number,
+  month: number,
+  year: number,
+) {
+  return `${lat.toFixed(3)},${lon.toFixed(3)}/${method}/${school}/${year}-${month}`;
+}
+
+export async function fetchMonthTimings(
+  lat: number,
+  lon: number,
+  method: number,
+  school: number,
+  month: number, // 1-12
+  year: number,
+  opts?: { signal?: AbortSignal },
+): Promise<MonthDay[]> {
+  // NOTE: Aladhan's /timingsByMonth endpoint 404s on the live API in every
+  // format, so the month is assembled from per-day /timings/DD-MM-YYYY calls
+  // (verified working). Fetched with bounded concurrency; each day response
+  // is cached 24h by the service-worker runtime cache.
+  if (opts?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+  const key = monthKey(lat, lon, method, school, month, year);
+  const cached = monthCache.get(key);
+  if (cached) return cached;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const results: MonthDay[] = new Array(daysInMonth);
+  let next = 0;
+  const CONCURRENCY = 6;
+  async function worker(): Promise<void> {
+    while (true) {
+      if (opts?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const i = next++;
+      if (i >= daysInMonth) return;
+      try {
+        const d = await fetchTimings(
+          lat,
+          lon,
+          method,
+          school,
+          new Date(year, month - 1, i + 1),
+        );
+        results[i] = {
+          dayNum: i + 1,
+          weekday: d.weekday,
+          gregorian: d.gregorian,
+          hijri: d.hijri,
+          timings: d.timings,
+        };
+      } catch (e) {
+        if (opts?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        throw new Error(
+          "Couldn't load the monthly timetable. Check your connection.",
+          { cause: e },
+        );
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, daysInMonth) }, () => worker()),
+  );
+  monthCache.set(key, results);
+  return results;
 }
 
 interface NominatimResult {
@@ -180,15 +284,45 @@ function shortLabel(addr: Record<string, string>): {
   return { label, sublabel };
 }
 
-export async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
+export class SearchError extends Error {
+  code: "rate-limit" | "network" | "aborted";
+  constructor(message: string, code: SearchError["code"], options?: ErrorOptions) {
+    super(message, options);
+    this.code = code;
+  }
+}
+
+export async function searchPlaces(
+  query: string,
+  opts?: { signal?: AbortSignal },
+): Promise<PlaceSuggestion[]> {
   const q = encodeURIComponent(query.trim());
   const url =
     `${NOMINATIM}/search?format=jsonv2&addressdetails=1&limit=6` +
     `&accept-language=en&q=${q}`;
-  const res = await fetchWithRetry(url, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error("Search failed");
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      url,
+      { headers: { Accept: "application/json" }, signal: opts?.signal },
+      10000,
+    );
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new SearchError("aborted", "aborted");
+    }
+    throw new SearchError(
+      "Couldn't search places. Check your connection and retry.",
+      "network",
+      { cause: e },
+    );
+  }
+  if (res.status === 429)
+    throw new SearchError(
+      "Too many searches — please wait a few seconds and try again.",
+      "rate-limit",
+    );
+  if (!res.ok) throw new SearchError("Search failed", "network");
   const arr = (await res.json()) as NominatimResult[];
   return arr.map((r) => {
     const { label, sublabel } = shortLabel(r.address || {});

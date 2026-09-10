@@ -21,7 +21,7 @@ function Segmented<T extends string | number>({
 }) {
   return (
     <div
-      className="grid gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1"
+      className="grid gap-1 rounded-xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] p-1"
       style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
     >
       {options.map((o) => (
@@ -59,10 +59,10 @@ export default function SettingsPanel({
       <div className="space-y-5">
         {/* Theme selector */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/50">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/60">
             Theme
           </label>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {THEMES.map((t) => (
               <button
                 key={t.id}
@@ -70,14 +70,14 @@ export default function SettingsPanel({
                 className={`group flex flex-col items-center gap-1.5 rounded-xl border p-2 transition ${
                   settings.theme === t.id
                     ? "border-gold/60 bg-gold/10"
-                    : "border-white/8 hover:border-white/20 hover:bg-white/5"
+                    : "border-[var(--color-glass-border)] hover:border-cream/25 hover:bg-cream/5"
                 }`}
               >
                 <span
                   className={`h-8 w-8 rounded-full ring-2 transition ${
                     settings.theme === t.id
                       ? "ring-gold ring-offset-2 ring-offset-deep"
-                      : "ring-white/10 group-hover:ring-white/25"
+                      : "ring-cream/15 group-hover:ring-cream/30"
                   }`}
                   style={{
                     background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)`,
@@ -92,7 +92,7 @@ export default function SettingsPanel({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/50">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/60">
             Calculation method
           </label>
           <div className="relative">
@@ -102,25 +102,32 @@ export default function SettingsPanel({
                 onChange({ ...settings, method: Number(e.target.value) })
               }
               style={{ colorScheme: "var(--color-scheme)" }}
-              className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 pr-10 text-cream outline-none transition focus:border-gold/50"
+              className="w-full appearance-none rounded-xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-3.5 py-3 pr-10 text-cream outline-none transition focus:border-gold/50"
             >
               {PRAYER_METHODS.map((m) => (
-                <option key={m.id} value={m.id} className="bg-night text-cream">
+                <option
+                  key={m.id}
+                  value={m.id}
+                  style={{
+                    background: "var(--color-select-bg)",
+                    color: "var(--color-cream)",
+                  }}
+                >
                   {m.name} — {m.region}
                 </option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-cream/40">
+              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-cream/60">
               ▾
             </span>
           </div>
           {method && (
-            <p className="mt-1.5 text-xs text-cream/40">{method.region}</p>
+            <p className="mt-1.5 text-xs text-cream/60">{method.region}</p>
           )}
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/50">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/60">
             Asr calculation
           </label>
           <Segmented
@@ -134,7 +141,7 @@ export default function SettingsPanel({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/50">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/60">
             Time format
           </label>
           <Segmented
@@ -148,13 +155,32 @@ export default function SettingsPanel({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/50">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/60">
+            Prayer alert sound
+          </label>
+          <Segmented
+            value={settings.alertSound}
+            onChange={(v) => onChange({ ...settings, alertSound: v })}
+            options={[
+              { value: "ping", label: "Soft ping" },
+              { value: "adhan", label: "Adhan" },
+            ]}
+          />
+          <p className="mt-1.5 text-xs text-cream/60">
+            {settings.alertSound === "adhan"
+              ? "Streams the call to prayer when alerts fire; falls back to ping offline."
+              : "Gentle two-tone chime, works fully offline."}
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-cream/60">
             Hijri date adjustment
           </label>
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-4 py-3">
             <div>
               <p className="text-sm text-cream">Adjust date</p>
-              <p className="text-xs text-cream/50">
+              <p className="text-xs text-cream/60">
                 {settings.hijriOffset === 0
                   ? "No adjustment"
                   : `${settings.hijriOffset > 0 ? "+" : ""}${settings.hijriOffset} day${Math.abs(settings.hijriOffset) === 1 ? "" : "s"}`}
@@ -169,9 +195,9 @@ export default function SettingsPanel({
                   })
                 }
                 disabled={settings.hijriOffset <= -5}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                className={`flex h-11 w-11 items-center justify-center rounded-full border transition ${
                   settings.hijriOffset <= -5
-                    ? "border-white/5 text-cream/20"
+                    ? "border-[var(--color-glass-border)] text-cream/20"
                     : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
                 }`}
               >
@@ -190,9 +216,9 @@ export default function SettingsPanel({
                   })
                 }
                 disabled={settings.hijriOffset >= 5}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                className={`flex h-11 w-11 items-center justify-center rounded-full border transition ${
                   settings.hijriOffset >= 5
-                    ? "border-white/5 text-cream/20"
+                    ? "border-[var(--color-glass-border)] text-cream/20"
                     : "border-gold/40 bg-gold/10 text-gold hover:bg-gold/20"
                 }`}
               >
@@ -204,7 +230,7 @@ export default function SettingsPanel({
           </div>
         </div>
 
-        <p className="rounded-xl bg-white/[0.03] px-3 py-2.5 text-xs leading-relaxed text-cream/40">
+        <p className="rounded-xl bg-[var(--color-glass-bg)] px-3 py-2.5 text-xs leading-relaxed text-cream/60">
           Methods differ in Fajr/Isha angle conventions. Choose the one followed
           by your local mosque or community for the most accurate times.
         </p>

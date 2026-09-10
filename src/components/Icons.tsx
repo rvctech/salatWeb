@@ -1,205 +1,123 @@
-import type { ReactElement, SVGProps } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import type { ComponentType, CSSProperties, ReactElement } from "react";
+import Mosque from "@mui/icons-material/Mosque";
+import Place from "@mui/icons-material/Place";
+import Search from "@mui/icons-material/Search";
+import MyLocation from "@mui/icons-material/MyLocation";
+import Settings from "@mui/icons-material/Settings";
+import AccessTime from "@mui/icons-material/AccessTime";
+import CalendarMonth from "@mui/icons-material/CalendarMonth";
+import Explore from "@mui/icons-material/Explore";
+import ExpandMore from "@mui/icons-material/ExpandMore";
+import Close from "@mui/icons-material/Close";
+import Check from "@mui/icons-material/Check";
+import AutoAwesome from "@mui/icons-material/AutoAwesome";
+import History from "@mui/icons-material/History";
+import ArrowForward from "@mui/icons-material/ArrowForward";
+import Nightlight from "@mui/icons-material/Nightlight";
+import WbTwilight from "@mui/icons-material/WbTwilight";
+import WbSunny from "@mui/icons-material/WbSunny";
+import BrightnessMedium from "@mui/icons-material/BrightnessMedium";
+import Brightness4 from "@mui/icons-material/Brightness4";
+import DarkMode from "@mui/icons-material/DarkMode";
 
-type IconProps = SVGProps<SVGSVGElement>;
+/*
+ * Salat Times icon system — Material UI.
+ * MUI SvgIcon ships `width/height: 1em` from emotion, which beats Tailwind's
+ * layered utilities, so each wrapper translates our `h-N w-N` classes into
+ * explicit inline px sizes. Everything else (color, margins) passes through.
+ */
 
-const base = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.7,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
+export interface IconProps {
+  className?: string;
+  style?: CSSProperties;
+}
 
-export function LogoIcon(props: IconProps) {
+type MuiIcon = ComponentType<{
+  className?: string;
+  style?: CSSProperties;
+  fontSize?: "inherit" | "small" | "medium" | "large";
+}>;
+
+function mui(Mui: MuiIcon) {
+  return function Icon({ className, style }: IconProps): ReactElement {
+    const m = className?.match(/h-(\d+(?:\.\d+)?)/);
+    const px = m ? Number(m[1]) * 4 : undefined;
+    return (
+      <Mui
+        className={className}
+        fontSize="inherit"
+        style={
+          px ? { width: px, height: px, fontSize: px, ...style } : style
+        }
+      />
+    );
+  };
+}
+
+/* ---------------- Brand + UI (Material) ---------------- */
+
+export const LogoIcon = mui(Mosque);
+export const PinIcon = mui(Place);
+export const SearchIcon = mui(Search);
+export const LocateIcon = mui(MyLocation);
+export const GearIcon = mui(Settings);
+export const ClockIcon = mui(AccessTime);
+export const CalendarIcon = mui(CalendarMonth);
+export const CompassIcon = mui(Explore);
+export const ChevronDownIcon = mui(ExpandMore);
+export const CloseIcon = mui(Close);
+export const CheckIcon = mui(Check);
+export const SparkleIcon = mui(AutoAwesome);
+export const HistoryIcon = mui(History);
+export const ArrowRightIcon = mui(ArrowForward);
+
+/* ---------------- Prayer cycle: dawn → night brightness gradient ---------------- */
+
+export const FajrIcon = mui(Nightlight); // pre-dawn night
+export const SunriseIcon = mui(WbTwilight); // sun on the horizon
+export const DhuhrIcon = mui(WbSunny); // full midday sun
+export const AsrIcon = mui(BrightnessMedium); // afternoon sun, fading
+export const MaghribIcon = mui(Brightness4); // setting sun, dim
+export const IshaIcon = mui(DarkMode); // night
+
+/* ---------------- No Material equivalent — kept custom ---------------- */
+// MUI has no Kaaba glyph (only Mosque/Church/Temple/Synagogue), so the
+// inlined Font Awesome Kaaba solid stays (CC BY 4.0 Fort Awesome).
+export function KaabaIcon({ className, style }: IconProps): ReactElement {
   return (
-    <svg {...base} {...props}>
-      <path d="M12 3c2.5 2 4 4.6 4 7.5 0 .5 0 1-.1 1.5" />
-      <path d="M4 21h16M6 21v-2a6 6 0 0 1 12 0v2" />
-      <path d="M9 9.2A6 6 0 0 0 8 13v6M16 13v6" />
-      <path d="M19.5 7.2a2.6 2.6 0 0 1-3 .2 2.7 2.7 0 0 1 2.3-4.6 3.8 3.8 0 0 0 .7 4.4Z" />
+    <svg viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" className={className} style={style}>
+      <path d="M256 51.3L92.8 112.4 247.5 171.1c5.5 2.1 11.5 2.1 17 0L419.2 112.4 256 51.3zM0 129.3c0-20 12.4-37.9 31.1-44.9l208-78c10.9-4.1 22.8-4.1 33.7 0l208 78c18.7 7 31.1 24.9 31.1 44.9l0 36-253.2 96c-1.8.7-3.8.7-5.7 0l-253.2-96 0-36zm0 140l0-52.7 236.1 89.6c12.8 4.9 26.9 4.9 39.7 0l236.1-89.6 0 52.7-128 48.6 0 51.3 128-48.6 0 62.2c0 20-12.4 37.9-31.1 44.9l-208 78c-10.9 4.1-22.8 4.1-33.7 0l-208-78C12.4 420.7 0 402.7 0 382.7l0-62.2 128 48.6 0-51.3-128-48.6zM236.1 410.1c12.8 4.9 26.9 4.9 39.7 0l60.1-22.8 0-51.3-77.2 29.3c-1.8.7-3.8.7-5.7 0l-77.2-29.3 0 51.3 60.1 22.8z" />
     </svg>
   );
 }
 
-export function PinIcon(props: IconProps) {
+// MUI has no Qibla-direction glyph — compass ring + needle to a Kaaba
+// marker on the NE rim, drawn in our 24px outline language.
+export function QiblaIcon({ className, style }: IconProps): ReactElement {
   return (
-    <svg {...base} {...props}>
-      <path d="M12 21s-6.5-5.4-6.5-10.2A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.8C18.5 15.6 12 21 12 21Z" />
-      <circle cx="12" cy="10.5" r="2.3" />
-    </svg>
-  );
-}
-
-export function SearchIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.2-3.2" />
-    </svg>
-  );
-}
-
-export function LocateIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="12" cy="12" r="3.4" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+      style={style}
+    >
       <circle cx="12" cy="12" r="8.5" />
+      <rect x="14.4" y="4.7" width="3.8" height="3.8" rx="0.8" fill="currentColor" fillOpacity={0.16} />
+      <path d="M14.4 6h3.8" strokeWidth={1.4} />
+      <path d="M12 12 15.3 8.1" strokeWidth={2.2} />
+      <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M12 12l-2.8 2.8" opacity={0.45} />
     </svg>
   );
 }
 
-export function GearIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M19.4 12c0-.5 0-1 .1-1.5l1.7-1.3-1.8-3.1-2 .8a6.7 6.7 0 0 0-2.6-1.5l-.3-2.2H8.5l-.3 2.2A6.7 6.7 0 0 0 5.6 7l-2-.8L1.8 9.2l1.7 1.3c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-1.7 1.3 1.8 3.1 2-.8a6.7 6.7 0 0 0 2.6 1.5l.3 2.2h3l.3-2.2a6.7 6.7 0 0 0 2.6-1.5l2 .8 1.8-3.1-1.7-1.3c.1-.5.1-1 .1-1.5Z" />
-    </svg>
-  );
-}
-
-export function ClockIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7.5V12l3 1.8" />
-    </svg>
-  );
-}
-
-export function CalendarIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
-      <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" />
-      <path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2" />
-    </svg>
-  );
-}
-
-export function CompassIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="12" cy="12" r="9" />
-      <path d="m14.8 9.2-1.4 4.2-4.2 1.4 1.4-4.2 4.2-1.4Z" />
-      <circle cx="12" cy="12" r="0.6" fill="currentColor" />
-    </svg>
-  );
-}
-
-export function ChevronDownIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-export function CloseIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
-  );
-}
-
-export function CheckIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="m5 12.5 4.5 4.5L19 7" />
-    </svg>
-  );
-}
-
-export function SparkleIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M12 3c.6 3.6 1.8 4.8 5.4 5.4-3.6.6-4.8 1.8-5.4 5.4-.6-3.6-1.8-4.8-5.4-5.4C10.2 7.8 11.4 6.6 12 3Z" />
-      <path d="M18.5 14c.3 1.6.9 2.2 2.5 2.5-1.6.3-2.2.9-2.5 2.5-.3-1.6-.9-2.2-2.5-2.5 1.6-.3 2.2-.9 2.5-2.5Z" />
-    </svg>
-  );
-}
-
-/* ---------- Prayer icons ---------- */
-
-export function FajrIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M19.6 13.6A7.5 7.5 0 0 1 8 18.4" />
-      <path d="M15.4 9.2A4.3 4.3 0 0 1 17 12.3" />
-      <path d="M3 18h18M5.5 21h13" />
-      <path d="M11.5 4.8a3 3 0 0 0 3.7 3.7 2.5 2.5 0 1 1-3.7-3.7Z" />
-      <path d="m6.6 5.6.5-.1M8.4 8.4l-.1.5" />
-    </svg>
-  );
-}
-
-export function SunriseIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M3 18h18M5.5 21h13" />
-      <path d="M12 4v3M5.6 9.6 7 11M18.4 9.6 17 11M3.5 14.5H5M21 14.5h-1.5" />
-      <path d="M8 14.5a4 4 0 0 1 8 0" />
-      <path d="m9 6.5 3-2.5 3 2.5" />
-    </svg>
-  );
-}
-
-export function DhuhrIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" />
-    </svg>
-  );
-}
-
-export function AsrIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="12" cy="11" r="3.4" />
-      <path d="M12 4v1.5M4.8 8.2 6 9M19.2 8.2 18 9M3.5 14.5h5M15.5 14.5h5" />
-      <path d="M3 18h18M5.5 21h13" />
-    </svg>
-  );
-}
-
-export function MaghribIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M3 18h18M5.5 21h13" />
-      <path d="M8 18a4 4 0 0 1 8 0" />
-      <path d="M12 10v2M5.8 11.8 7 13M18.2 11.8 17 13M3.5 15.5H5M19 15.5h-1.5" />
-      <path d="m9 8 3 2 3-2" />
-    </svg>
-  );
-}
-
-export function IshaIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M18.5 13.2A6.5 6.5 0 0 1 9.2 19 5.2 5.2 0 1 0 14.8 9a6.4 6.4 0 0 0 3.7 4.2Z" />
-      <path d="m16.6 6.4.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4.4-1Z" />
-      <path d="M6.5 7.5l.3.7.7.3-.7.3-.3.7-.3-.7-.7-.3.7-.3.3-.7Z" />
-    </svg>
-  );
-}
-
-export function KaabaIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <rect x="4" y="7" width="16" height="13" rx="1" />
-      <path d="M4 11h16" />
-      <path d="M7 7.5 9 4h6l2 3.5" />
-      <path d="M4 13.5h16" />
-      <path d="M9 11v2.5M15 11v2.5" />
-    </svg>
-  );
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const PRAYER_ICONS: Record<string, (p: IconProps) => ReactElement> = {
+export const PRAYER_ICONS: Record<string, ComponentType<IconProps>> = {
   Fajr: FajrIcon,
   Sunrise: SunriseIcon,
   Dhuhr: DhuhrIcon,

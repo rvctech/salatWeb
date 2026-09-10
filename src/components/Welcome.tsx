@@ -29,7 +29,7 @@ export default function Welcome({
       <p className="mt-1 font-arabic text-2xl text-gold/80" dir="rtl">
         مواقيت الصلاة
       </p>
-      <p className="mt-4 max-w-sm text-balance text-cream/55">
+      <p className="mt-4 max-w-sm text-balance text-cream/70">
         Accurate daily prayer times, the Hijri date and Qibla direction — for
         your location or any city in the world.
       </p>
@@ -49,14 +49,14 @@ export default function Welcome({
         </button>
         <button
           onClick={onSearch}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-6 py-3.5 font-semibold text-cream transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-6 py-3.5 font-semibold text-cream transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
         >
           <SearchIcon className="h-5 w-5" />
           Search a city
         </button>
       </div>
 
-      <p className="mt-5 min-h-[2.5rem] max-w-sm text-sm text-cream/45">
+      <p className="mt-5 min-h-[2.5rem] max-w-sm text-sm text-cream/60">
         {busy
           ? "Fetching the most accurate prayer times for you…"
           : hint ??
