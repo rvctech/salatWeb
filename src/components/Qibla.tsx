@@ -126,11 +126,26 @@ export default function Qibla({ bearing, lat, lon }: Props) {
   }, [facingQibla, vibrateOn]);
 
   function toggleVibrate() {
+    if (!vibrateOn && !("vibrate" in navigator)) {
+      // iPhones and most desktops expose no vibration hardware to the web.
+      setStatus(
+        "Vibration isn't supported on this device or browser — the green ring still shows alignment.",
+      );
+      return;
+    }
     setVibrateOn((v) => {
       try {
         localStorage.setItem(VIBRATE_KEY, v ? "0" : "1");
       } catch {
         /* ignore */
+      }
+      if (!v) {
+        // Instant test buzz so enabling gives immediate feedback.
+        try {
+          navigator.vibrate(60);
+        } catch {
+          /* ignore */
+        }
       }
       return !v;
     });
