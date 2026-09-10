@@ -1,6 +1,8 @@
 # Salat Times 🕌
 
-A beautiful prayer-times PWA with live next-prayer countdown, Hijri date, Qibla compass, monthly timetable, and prayer alerts.
+A beautiful, fully-functional prayer-times web app with live next-prayer countdown, Hijri date, Qibla direction, monthly timetable, prayer alerts, 5 themes, and offline PWA support.
+
+Built with React + Vite + Tailwind.
 
 ![React 19](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
 ![Vite 7](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)
