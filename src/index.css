@@ -267,6 +267,21 @@ body {
     transform: translateY(0) scale(1);
   }
 }
+@keyframes figure8 {
+  0%,
+  100% {
+    transform: translate(-26px, 0) rotate(-18deg);
+  }
+  25% {
+    transform: translate(0, -16px) rotate(8deg);
+  }
+  50% {
+    transform: translate(26px, 0) rotate(18deg);
+  }
+  75% {
+    transform: translate(0, 16px) rotate(-8deg);
+  }
+}
 @keyframes loadbar {
   0% {
     transform: translateX(-120%);
@@ -293,6 +308,9 @@ body {
 }
 .animate-popIn {
   animation: popIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.animate-figure8 {
+  animation: figure8 3s ease-in-out infinite;
 }
 
 /* Modals behave as bottom sheets on phones (thumb reach, native feel),
@@ -409,6 +427,7 @@ body {
   }
   .animate-floaty,
   .animate-spinSlow,
+  .animate-figure8,
   .topbar-fill,
   .shimmer-text,
   .modal-panel {

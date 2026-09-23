@@ -13,7 +13,9 @@ interface Props {
 
 interface DeviceOrientationEventExt extends Event {
   webkitCompassHeading?: number;
+  webkitCompassAccuracy?: number;
   alpha?: number | null;
+  absolute?: boolean | null;
 }
 
 interface DeviceOrientationEventConstructor {
@@ -31,6 +33,18 @@ const CARDINALS = [
 
 const QIBLA_TOLERANCE = 5; // deg — matches onlinecompass.io behavior
 const VIBRATE_KEY = "salat.qibla.vibrate";
+const OFFSET_KEY = "salat.qibla.offset";
+const COMPASS_HINT =
+  "Hold your device flat and face forward — the Kaaba marks Qibla.";
+
+function loadOffset(): number {
+  try {
+    const v = Number(localStorage.getItem(OFFSET_KEY));
+    return Number.isFinite(v) ? Math.max(-30, Math.min(30, v)) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 /* Geometry is expressed in % of the dial face (plus cqw for stroke text),
  * so the same component renders crisply at card size and fullscreen. */
@@ -41,6 +55,52 @@ const CARDINAL_R = 30.6;
 function faceXY(deg: number, r: number): [number, number] {
   const rad = (deg * Math.PI) / 180;
   return [50 + r * Math.sin(rad), 50 - r * Math.cos(rad)];
+}
+
+/* Live calibration verdict: iOS reports heading accuracy in degrees
+ * (negative = uncalibrated); elsewhere we fall back to signal steadiness. */
+function CalibrationBadge({
+  compassOn,
+  accuracy,
+  steady,
+}: {
+  compassOn: boolean;
+  accuracy: number | null;
+  steady: boolean | null;
+}) {
+  if (!compassOn) return null;
+  let tone = "border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] text-cream/60";
+  let text = "Reading sensors…";
+  if (accuracy != null) {
+    if (accuracy < 0) {
+      tone = "border-red-400/40 bg-danger-soft text-danger";
+      text = "Uncalibrated — do the figure-8 above";
+    } else if (accuracy <= 10) {
+      tone =
+        "border-emerald-400/40 bg-emerald-400/10 text-emerald-200";
+      text = `Calibrated · accurate to ±${Math.round(accuracy)}°`;
+    } else {
+      tone = "border-amber-400/40 bg-amber-400/10 text-amber-200";
+      text = `Rough · ±${Math.round(accuracy)}° — keep waving`;
+    }
+  } else if (steady != null) {
+    if (steady) {
+      tone =
+        "border-emerald-400/40 bg-emerald-400/10 text-emerald-200";
+      text = "Steady signal — compass looks calibrated";
+    } else {
+      tone = "border-amber-400/40 bg-amber-400/10 text-amber-200";
+      text = "Signal jumpy — wave the figure-8 above";
+    }
+  }
+  return (
+    <p
+      role="status"
+      className={`rounded-2xl border px-4 py-2.5 text-center text-[13px] font-semibold transition ${tone}`}
+    >
+      {text}
+    </p>
+  );
 }
 
 interface DialProps {
@@ -217,6 +277,14 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
   const [heading, setHeading] = useState<number | null>(null);
   const [active, setActive] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
+  // iOS reports heading accuracy in degrees (negative = uncalibrated).
+  // Android exposes nothing, so we derive a steadiness verdict instead.
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [steady, setSteady] = useState<boolean | null>(null);
+  const [offset, setOffsetState] = useState<number>(() => loadOffset());
+  const samplesRef = useRef<number[]>([]);
+  const steadyRef = useRef<boolean | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [vibrateOn, setVibrateOn] = useState(() => {
     try {
@@ -255,16 +323,66 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
       // and drop sub-degree jitter.
       let raf = 0;
       let last = -1;
+      let warned = false;
       const handler = (e: DeviceOrientationEventExt) => {
         if (raf) return;
         raf = requestAnimationFrame(() => {
           raf = 0;
+          // webkitCompassHeading (iOS) is always Earth-referenced. Raw alpha
+          // is only a compass when the event is absolute — a gyro-relative
+          // alpha measures an arbitrary starting pose, and steering the
+          // needle by it points Qibla the wrong way. Reject explicitly
+          // non-absolute readings instead of trusting them.
           let h: number | null = e.webkitCompassHeading ?? null;
-          if (h == null && e.alpha != null) h = 360 - e.alpha;
-          if (h == null || Number.isNaN(h)) return;
+          if (h == null && e.absolute !== false && e.alpha != null) {
+            h = (360 - e.alpha) % 360;
+          }
+          if (h == null || Number.isNaN(h)) {
+            // Uncalibrated / relative sensors: say so once instead of
+            // freezing on a misleading arrow.
+            if (!warned) {
+              warned = true;
+              setStatus(
+                "Compass isn't calibrated — wave your phone in a figure-8 until it settles, then re-enable it.",
+              );
+            }
+            return;
+          }
+          h = ((h % 360) + 360) % 360;
+          if (warned) {
+            warned = false;
+            setStatus(COMPASS_HINT);
+          }
           if (last >= 0 && Math.abs(h - last) < 0.5) return;
           last = h;
           setHeading(h);
+          // iOS accuracy (degrees, negative = uncalibrated).
+          const acc = e.webkitCompassAccuracy;
+          setAccuracy(
+            typeof acc === "number" && Number.isFinite(acc) ? acc : null,
+          );
+          // Android steadiness: max deviation of the last ~15 accepted
+          // samples from their circular mean. Under 4° = steady sensor.
+          const s = samplesRef.current;
+          s.push(h);
+          if (s.length > 15) s.shift();
+          if (s.length >= 8) {
+            const rad = s.map((d) => (d * Math.PI) / 180);
+            const mx = rad.reduce((a, d) => a + Math.sin(d), 0) / s.length;
+            const my = rad.reduce((a, d) => a + Math.cos(d), 0) / s.length;
+            const mean = Math.atan2(mx, my);
+            const dev = Math.max(
+              ...s.map((d) => {
+                const dd = Math.abs(d - (mean * 180) / Math.PI);
+                return dd > 180 ? 360 - dd : dd;
+              }),
+            );
+            const isSteady = dev < 4;
+            if (steadyRef.current !== isSteady) {
+              steadyRef.current = isSteady;
+              setSteady(isSteady);
+            }
+          }
         });
       };
       evtRef.current =
@@ -274,23 +392,37 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
       handlerRef.current = handler;
       window.addEventListener(evtRef.current, handler as EventListener, true);
       setActive(true);
-      setStatus(
-        "Hold your device flat and face forward — the Kaaba marks Qibla.",
-      );
+      setStatus(COMPASS_HINT);
     } catch {
       setStatus("Unable to read the compass.");
     }
   }
 
+  function setOffset(v: number) {
+    const clamped = Math.max(-30, Math.min(30, Math.round(v)));
+    setOffsetState(clamped);
+    try {
+      localStorage.setItem(OFFSET_KEY, String(clamped));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Sensor heading corrected by the manual calibration offset.
+  // Every readout below derives from this — never the raw heading.
+  const adjHeading =
+    heading == null ? null : ((heading + offset) % 360 + 360) % 360;
+  const compassOn = active && adjHeading != null;
+
   const facingQibla = (() => {
-    if (!active || heading == null) return false;
-    const diff = ((bearing - heading + 540) % 360) - 180;
+    if (!compassOn || adjHeading == null) return false;
+    const diff = ((bearing - adjHeading + 540) % 360) - 180;
     return Math.abs(diff) <= QIBLA_TOLERANCE;
   })();
 
   const turnHint = (() => {
-    if (!active || heading == null) return "";
-    const diff = ((bearing - heading + 540) % 360) - 180;
+    if (!compassOn || adjHeading == null) return "";
+    const diff = ((bearing - adjHeading + 540) % 360) - 180;
     const abs = Math.abs(diff);
     const dir = diff > 0 ? "left" : "right";
     if (abs <= QIBLA_TOLERANCE) return "Facing Qibla!";
@@ -341,39 +473,41 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
   ];
 
   const kaabaColor =
-    active && heading != null
+    compassOn
       ? facingQibla
         ? "bg-emerald-500 border-emerald-500 text-white"
         : "bg-red-500 border-red-500 text-white"
       : "bg-gold/10 border-gold/40 text-gold";
 
   const kaabaGlow =
-    active && heading != null && facingQibla
+    compassOn && facingQibla
       ? "shadow-[0_0_24px_rgba(16,185,129,0.5)]"
       : "";
 
   const distance = haversineKm(lat, lon, KAABA.lat, KAABA.lon);
-  const dialRotation = active && heading != null ? -heading : 0;
+  const dialRotation = compassOn && adjHeading != null ? -adjHeading : 0;
   const needleRotation =
-    active && heading != null
-      ? ((bearing - heading) % 360 + 360) % 360
+    compassOn && adjHeading != null
+      ? ((bearing - adjHeading) % 360 + 360) % 360
       : bearing;
-  const compassOn = active && heading != null;
 
-  // Fullscreen overlay: lock body scroll + close on Escape.
+  // Overlays (fullscreen + calibration): lock body scroll + close on Escape.
   useEffect(() => {
-    if (!expanded) return;
+    if (!expanded && !calibrating) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpanded(false);
+      if (e.key === "Escape") {
+        setExpanded(false);
+        setCalibrating(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
-  }, [expanded]);
+  }, [expanded, calibrating]);
 
   return (
     <>
@@ -413,7 +547,7 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
           dialRotation={dialRotation}
           needleRotation={needleRotation}
           facingQibla={facingQibla}
-          compassOn={active && heading != null}
+          compassOn={compassOn}
           className="w-44 sm:w-52"
         />
         {/* readout */}
@@ -425,16 +559,19 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
             </p>
             <p className="mt-1 text-sm font-medium text-cream/70">
               {cardinal} <span className="text-cream/40">· from North</span>
-              {active && heading != null && (
+              {compassOn && adjHeading != null && (
                 <span className="tnum block text-xs text-cream/55">
-                  Qibla {Math.round(bearing)}° · You {Math.round(heading)}°
+                  Qibla {Math.round(bearing)}° · You {Math.round(adjHeading)}°
+                  {accuracy != null && accuracy >= 0 && ` · ±${Math.round(accuracy)}°`}
+                  {offset !== 0 &&
+                    ` · ${offset > 0 ? "+" : ""}${offset}° adj`}
                 </span>
               )}
             </p>
             <div
               className={`mt-3 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-300 ${kaabaColor} ${kaabaGlow}`}
             >
-              {active && heading != null
+              {compassOn
                 ? facingQibla
                   ? "Qibla found — you're aligned"
                   : turnHint
@@ -468,6 +605,19 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
                 />
               </span>
               Buzz
+            </button>
+            <button
+              onClick={() => setCalibrating(true)}
+              title="Calibrate the compass"
+              className="inline-flex min-h-[36px] items-center gap-2 rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-4 py-2 text-sm font-semibold text-cream/60 transition hover:text-cream active:scale-95"
+            >
+              Calibrate
+              {offset !== 0 && (
+                <span className="tnum rounded-full bg-gold/15 px-1.5 py-px text-[11px] text-gold">
+                  {offset > 0 ? "+" : ""}
+                  {offset}°
+                </span>
+              )}
             </button>
           </div>
           {status && (
@@ -548,6 +698,136 @@ export default function Qibla({ bearing, lat, lon, style }: Props) {
             {status}
           </p>
         )}
+        </div>
+      </div>
+    )}
+
+    {/* Calibration sheet */}
+    {calibrating && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calibrate compass"
+        className="animate-fadeIn fixed inset-0 z-50 flex overflow-y-auto backdrop-blur-md"
+        style={{
+          background:
+            "color-mix(in srgb, var(--color-body-bg) 94%, transparent)",
+        }}
+      >
+        <div className="m-auto flex w-full max-w-md flex-col gap-4 p-5">
+          <div className="flex w-full items-center justify-between">
+            <p className="font-display text-lg font-semibold text-cream">
+              Calibrate compass
+            </p>
+            <button
+              onClick={() => setCalibrating(false)}
+              aria-label="Close calibration"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] text-cream/70 transition hover:border-gold/40 hover:text-gold"
+            >
+              <CloseIcon className="h-5 w-5" />
+            </button>
+          </div>
+
+          {!compassOn ? (
+            <div className="rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] p-4 text-center">
+              <p className="text-sm text-cream/75">
+                Turn on the live compass first — calibration needs live
+                sensor data.
+              </p>
+              <button
+                onClick={enableCompass}
+                className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-5 py-2.5 text-sm font-semibold text-gold transition hover:bg-gold/20 active:scale-95"
+              >
+                <LocateIcon className="h-4 w-4" />
+                Use live compass
+              </button>
+            </div>
+          ) : (
+            <>
+              <ol className="space-y-2.5">
+                {[
+                  "Hold your phone flat, screen up.",
+                  "Trace a figure-8 in the air a few times.",
+                  "Hold still — watch the badge below turn green.",
+                ].map((step, i) => (
+                  <li
+                    key={step}
+                    className="flex items-center gap-3 rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-4 py-3 text-sm text-cream/85"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/15 text-[13px] font-bold text-gold">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+
+              {/* figure-8 demo */}
+              <div
+                aria-hidden="true"
+                className="flex h-28 items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)]"
+              >
+                <div className="animate-figure8 flex h-14 w-8 items-center justify-center rounded-lg border-2 border-gold bg-gold/15">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                </div>
+              </div>
+
+              <CalibrationBadge
+                compassOn={compassOn}
+                accuracy={accuracy}
+                steady={steady}
+              />
+
+              {/* manual fine-tune for stubborn constant bias */}
+              <div className="rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] p-4">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="qibla-offset"
+                    className="text-sm font-semibold text-cream"
+                  >
+                    Manual fine-tune
+                  </label>
+                  <span className="tnum rounded-full bg-gold/15 px-2.5 py-1 text-xs font-bold text-gold">
+                    {offset > 0 ? "+" : ""}
+                    {offset}°
+                  </span>
+                </div>
+                <input
+                  id="qibla-offset"
+                  type="range"
+                  min={-30}
+                  max={30}
+                  step={1}
+                  value={offset}
+                  onChange={(e) => setOffset(Number(e.target.value))}
+                  className="mt-3 w-full accent-gold"
+                />
+                <div className="mt-1 flex items-center justify-between text-[11px] text-cream/50">
+                  <span>-30°</span>
+                  {offset !== 0 ? (
+                    <button
+                      onClick={() => setOffset(0)}
+                      className="font-semibold text-gold hover:underline"
+                    >
+                      Reset to 0°
+                    </button>
+                  ) : (
+                    <span>
+                      Point at a known north, then nudge until the dial agrees
+                    </span>
+                  )}
+                  <span>+30°</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setCalibrating(false)}
+                className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-linear-to-r from-gold to-gold-soft font-semibold text-night transition hover:brightness-105 active:scale-[0.98]"
+              >
+                Done
+              </button>
+            </>
+          )}
         </div>
       </div>
     )}
