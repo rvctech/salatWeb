@@ -74,13 +74,15 @@ export default function Modal({ open, onClose, title, icon, children }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto sm:items-center sm:p-4"
     >
       <div
         className="animate-fadeIn fixed inset-0 bg-black/55 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="animate-popIn relative z-10 my-6 w-full max-w-md rounded-3xl border border-[var(--color-glass-border)] glass-strong p-5 shadow-2xl">
+      <div className="modal-panel relative z-10 max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-[var(--color-glass-border)] glass-strong p-5 pt-3 shadow-2xl sm:max-h-none sm:rounded-3xl sm:pt-5">
+        {/* Sheet grabber — phones only */}
+        <div aria-hidden="true" className="mx-auto mb-3 h-1 w-9 rounded-full bg-cream/25 sm:hidden" />
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-cream">
             {icon}

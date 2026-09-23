@@ -1,8 +1,11 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState } from "react";
 import { ensureAudio, playAdhan, playPing, stopAdhan } from "../lib/notify";
 import type { AlertSound } from "../lib/api";
 
 const MonthPanel = lazy(() => import("./MonthPanel"));
+// Qibla dial is heavy (72 ticks + needle + compass) and static per location —
+// memoize so the 1s countdown tick doesn't re-render it 60x/minute.
+const MemoQibla = memo(lazy(() => import("./Qibla")));
 import {
   PRAYER_ORDER,
   SALAH_ORDER,
@@ -19,7 +22,6 @@ import { useNow } from "../hooks/useNow";
 import LocationBar from "./LocationBar";
 import NextPrayer from "./NextPrayer";
 import PrayerCard, { type CardStatus } from "./PrayerCard";
-import Qibla from "./Qibla";
 import type { LocationInfo, PrayerData } from "../lib/types";
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -34,6 +36,7 @@ interface Props {
   hijriOffset: number;
   offline?: boolean;
   refreshing?: boolean;
+  onAlertError?: (msg: string) => void;
 }
 
 export default function Results({
@@ -46,9 +49,12 @@ export default function Results({
   hijriOffset,
   offline,
   refreshing,
+  onAlertError,
 }: Props) {
   const [tab, setTab] = useState<0 | 1>(0);
   const [monthOpen, setMonthOpen] = useState(false);
+  const nextRef = useRef<HTMLDivElement | null>(null);
+  const didAutoScroll = useRef(false);
   const [alertsOn, setAlertsOn] = useState(
     () =>
       typeof Notification !== "undefined" &&
@@ -75,7 +81,18 @@ export default function Results({
 
   const isTomorrow = nextSalah.dayOffset > 0;
 
-  const cacheAge = formatCacheAge(loadCacheTime(), now);
+  // Cache age only changes per minute — don't hit localStorage 60x/minute
+  // on the 1s tick. Bucket by minute so this memoizes between ticks.
+  const minuteBucket = Math.floor(now / 60000);
+  const cacheAge = useMemo(
+    () => formatCacheAge(loadCacheTime(), minuteBucket * 60000),
+    [minuteBucket],
+  );
+  const memoizedBearing = useMemo(
+    () => bearing,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [location.lat, location.lon],
+  );
 
   // Live tab title countdown.
   useEffect(() => {
@@ -86,15 +103,33 @@ export default function Results({
     };
   }, [remaining.h, remaining.m, remaining.s, nextSalah.name]);
 
-  // Prayer alert at exact time: OS notification + soft ping.
+  // Gently bring the NEXT card into view on first paint — but only if it's
+  // actually off-screen (block: nearest never yanks visible content).
+  useEffect(() => {
+    if (didAutoScroll.current) return;
+    didAutoScroll.current = true;
+    const t = setTimeout(() => {
+      nextRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 450);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Prayer alert at exact time: OS notification + sound.
   // Page must stay open (in-tab timer, no push). Re-arms per prayer.
   useEffect(() => {
     if (!alertsOn || typeof Notification === "undefined") return;
     const ms = Math.max(0, nextSalah.ms - zonedNowMs(tz, Date.now()));
     if (!Number.isFinite(ms) || ms > 2147483647) return;
     const t = setTimeout(() => {
-      if (alertSound === "adhan") playAdhan();
-      else playPing();
+      void (async () => {
+        const ok =
+          alertSound === "adhan" ? await playAdhan() : await playPing();
+        if (!ok) {
+          onAlertError?.(
+            `${nextSalah.name} is now — sound couldn't play. Check volume and silent mode.`,
+          );
+        }
+      })();
       try {
         new Notification(`Time for ${nextSalah.name}`, {
           body: `${nextSalah.name} is now · ${nextFormatted}`,
@@ -105,12 +140,18 @@ export default function Results({
       }
     }, ms);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertsOn, alertSound, nextSalah.ms, nextSalah.key, nextSalah.name, nextFormatted, tz]);
 
   async function enableAlerts() {
     ensureAudio();
-    if (alertSound === "adhan") playAdhan();
-    else playPing(0.08); // soft preview so the user hears what to expect
+    // Soft preview so the user hears what to expect — and immediate
+    // feedback if this device can't produce sound.
+    const ok =
+      alertSound === "adhan" ? await playAdhan() : await playPing(0.12);
+    if (!ok) {
+      onAlertError?.("Couldn't play the preview — check volume and silent mode.");
+    }
     try {
       const p = await Notification.requestPermission();
       setAlertsOn(p === "granted");
@@ -126,10 +167,7 @@ export default function Results({
   }
 
   return (
-    <div
-      className={`space-y-5 transition-opacity duration-300 ${refreshing ? "pointer-events-none opacity-60" : ""}`}
-      aria-busy={refreshing || undefined}
-    >
+    <div className="space-y-5" aria-busy={refreshing || undefined}>
       {offline && (
         <p
           role="status"
@@ -144,22 +182,26 @@ export default function Results({
         now={now}
         h12={h12}
         hijriOffset={hijriOffset}
+        style={{ animationDelay: "20ms" }}
       />
 
       <NextPrayer
+        key={`${nextSalah.key}-${isTomorrow ? "tmr" : "today"}`}
         next={nextSalah}
         prevName={prevSalah.name}
         formattedTime={nextFormatted}
         remaining={remaining}
         progress={progress}
         isTomorrow={isTomorrow}
+        style={{ animationDelay: "90ms" }}
       />
 
       {(canAskAlerts || alertsOn) && (
         <button
           onClick={() => (alertsOn ? disableAlerts() : void enableAlerts())}
           aria-pressed={alertsOn}
-          className={`w-full rounded-2xl border px-4 py-2.5 text-[13px] font-semibold transition active:scale-[0.99] ${
+          style={{ animationDelay: "150ms" }}
+          className={`animate-fadeUp w-full rounded-2xl border px-4 py-2.5 text-[13px] font-semibold transition active:scale-[0.99] ${
             alertsOn
               ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20"
               : "border-gold/30 bg-gold/10 text-gold hover:bg-gold/20"
@@ -171,17 +213,28 @@ export default function Results({
         </button>
       )}
 
-      <section aria-label="Prayer timetable">
+      <section id="sec-times" aria-label="Prayer timetable" style={{ animationDelay: "210ms" }} className="animate-fadeUp scroll-mt-32">
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-cream/60">
             Timetable
           </h3>
-          <button
-            onClick={() => setMonthOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-3 py-1.5 text-xs font-semibold text-cream/75 transition hover:border-gold/40 hover:text-gold"
-          >
-            Month view
-          </button>
+          <div className="flex items-center gap-2">
+            {refreshing && (
+              <span
+                role="status"
+                className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-2.5 py-1 text-[11px] font-semibold text-gold"
+              >
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-gold/30 border-t-gold" />
+                Updating…
+              </span>
+            )}
+            <button
+              onClick={() => setMonthOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] px-3 py-1.5 text-xs font-semibold text-cream/75 transition hover:border-gold/40 hover:text-gold"
+            >
+              Month view
+            </button>
+          </div>
         </div>
         <div
           role="tablist"
@@ -199,7 +252,7 @@ export default function Results({
               role="tab"
               aria-selected={tab === t.v}
               onClick={() => setTab(t.v)}
-              className={`truncate rounded-xl px-3 py-2 text-sm font-medium transition ${
+              className={`min-h-[44px] truncate rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                 tab === t.v
                   ? "bg-gold text-night shadow"
                   : "text-cream/65 hover:text-cream"
@@ -209,7 +262,7 @@ export default function Results({
             </button>
           ))}
         </div>
-        <div className="space-y-2 sm:space-y-2.5" role="tabpanel">
+        <div className="grid gap-2 sm:grid-cols-2 sm:gap-2.5" role="tabpanel">
           {PRAYER_ORDER.map((item, idx) => {
             const src = tab === 1 && tomorrow ? tomorrow.timings : data.timings;
             const { h, m } = parseHM(src[item.key]);
@@ -222,9 +275,11 @@ export default function Results({
               else if (item.key === "Sunrise" && nextEvent.key === "Sunrise")
                 s = "soon";
             }
+            const isNext = tab === 0 && item.key === nextSalah.key;
             return (
               <PrayerCard
                 key={item.key}
+                ref={isNext ? nextRef : undefined}
                 item={item}
                 time={time}
                 status={s}
@@ -241,7 +296,22 @@ export default function Results({
         </div>
       </section>
 
-      <Qibla bearing={bearing} lat={location.lat} lon={location.lon} />
+      {/* Below the fold + heavy dial: lazy + memoized so the 1s tick
+          never re-renders it. Loads only when scrolled near. */}
+      <Suspense
+        fallback={
+          <div className="rounded-3xl border border-[var(--color-glass-border)] p-5 text-center text-sm text-cream/60">
+            Loading Qibla…
+          </div>
+        }
+      >
+        <MemoQibla
+          bearing={memoizedBearing}
+          lat={location.lat}
+          lon={location.lon}
+          style={{ animationDelay: "300ms" }}
+        />
+      </Suspense>
 
       <Suspense fallback={null}>
         {monthOpen && (

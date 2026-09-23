@@ -49,7 +49,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,json}"],
+        // mp3 included so the bundled Adhan alert works fully offline.
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,json,mp3}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.aladhan\.com\/.*/i,
@@ -69,6 +70,28 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+    },
+  },
+  build: {
+    target: "es2020",
+    cssMinify: true,
+    chunkSizeWarningLimit: 300,
+    modulePreload: { polyfill: false },
+    rollupOptions: {
+      output: {
+        // Keep the initial shell tiny: React core goes in its own
+        // long-lived chunk so first paint parses less at once and the
+        // vendor hash stays stable across app edits (better HTTP cache).
+        manualChunks(id) {
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/scheduler/")
+          ) {
+            return "vendor";
+          }
+        },
+      },
     },
   },
 });

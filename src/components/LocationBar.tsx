@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   PinIcon,
   ClockIcon,
@@ -14,6 +14,7 @@ interface Props {
   now: number;
   h12: boolean;
   hijriOffset: number;
+  style?: CSSProperties;
 }
 
 function InfoTile({
@@ -63,12 +64,16 @@ export default function LocationBar({
   now,
   h12,
   hijriOffset = 0,
+  style,
 }: Props) {
   const tz = data?.timezone;
   const clock = tz ? zonedClock(tz, now, h12) : "—";
 
   return (
-    <section className="animate-fadeUp rounded-3xl border border-[var(--color-glass-border)] glass p-4 sm:p-6">
+    <section
+      style={style}
+      className="animate-fadeUp rounded-3xl border border-[var(--color-glass-border)] glass p-4 sm:p-6"
+    >
       {/* Display-only: Search / Locate live in the sticky header. */}
       <div className="flex min-w-0 items-center gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gold/10 text-gold ring-1 ring-gold/30 sm:h-12 sm:w-12">

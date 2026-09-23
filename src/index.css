@@ -1,12 +1,11 @@
 @import "tailwindcss";
 
-/* Smooth theme switching */
-html,
-html *,
-html *::before,
-html *::after {
-  transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease,
-    box-shadow 0.35s ease, opacity 0.35s ease;
+/* Smooth theme switching — scoped to themed surfaces only.
+ * NOTE: never use a global `html *` transition: it forces style recalc on
+ * every DOM mutation (including the 1s countdown tick) and tanks load/scroll. */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+  scroll-behavior: smooth;
 }
 
 /* ---------- Theme variables ---------- */
@@ -169,7 +168,8 @@ body {
     radial-gradient(1200px 700px at 78% -8%, var(--color-glow-1), transparent 60%),
     radial-gradient(900px 600px at 10% 8%, var(--color-glow-2), transparent 55%),
     var(--color-body-gradient);
-  background-attachment: fixed;
+  /* NOTE: background-attachment: fixed forces a full repaint on every scroll
+   * frame on mobile GPUs — removed for load/scroll performance. */
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background-color 0.3s, color 0.3s;
@@ -257,6 +257,16 @@ body {
     transform: scale(1) translateY(0);
   }
 }
+@keyframes sheetUp {
+  0% {
+    opacity: 0;
+    transform: translateY(32px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 @keyframes loadbar {
   0% {
     transform: translateX(-120%);
@@ -283,6 +293,17 @@ body {
 }
 .animate-popIn {
   animation: popIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Modals behave as bottom sheets on phones (thumb reach, native feel),
+ * centered popovers on larger screens. */
+.modal-panel {
+  animation: sheetUp 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (min-width: 640px) {
+  .modal-panel {
+    animation: popIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
 }
 
 .glass {
@@ -389,7 +410,8 @@ body {
   .animate-floaty,
   .animate-spinSlow,
   .topbar-fill,
-  .shimmer-text {
+  .shimmer-text,
+  .modal-panel {
     animation: none !important;
   }
 }

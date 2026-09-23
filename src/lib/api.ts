@@ -219,7 +219,10 @@ export async function fetchMonthTimings(
   const daysInMonth = new Date(year, month, 0).getDate();
   const results: MonthDay[] = new Array(daysInMonth);
   let next = 0;
-  const CONCURRENCY = 6;
+  // Bounded concurrency: 30 per-day requests share the connection pool with
+  // the first-paint API calls — keep it low so month prefetch never starves
+  // initial load. (Previously 6; 4 halves connection contention.)
+  const CONCURRENCY = 4;
   async function worker(): Promise<void> {
     while (true) {
       if (opts?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -364,43 +367,24 @@ export function getGeolocation(): Promise<{ lat: number; lon: number }> {
       return;
     }
 
-    let resolved = false;
-
-    // First try a cached position (instant)
+    // Single request: allow a stale cached fix (10 min) for instant resolve,
+    // but cap the wait at 8s so first paint never hangs on GPS.
+    // (Previously two parallel getCurrentPosition calls, one up to 10s —
+    // wasted radio + blocked the loading state.)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (!resolved) {
-          resolved = true;
-          resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        }
-      },
-      () => {
-        /* ignore — fallback below */
-      },
-      { enableHighAccuracy: false, timeout: 0, maximumAge: 86400000 },
-    );
-
-    // Then request a fresh position in the background
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (!resolved) {
-          resolved = true;
-          resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        }
+        resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
       },
       (err) => {
-        if (!resolved) {
-          resolved = true;
-          const msg =
-            err.code === err.PERMISSION_DENIED
-              ? "Location permission denied. Search a city instead."
-              : err.code === err.POSITION_UNAVAILABLE
-                ? "Location unavailable. Search a city instead."
-                : "Location request timed out. Search a city instead.";
-          reject(new Error(msg));
-        }
+        const msg =
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission denied. Search a city instead."
+            : err.code === err.POSITION_UNAVAILABLE
+              ? "Location unavailable. Search a city instead."
+              : "Location request timed out. Search a city instead.";
+        reject(new Error(msg));
       },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 },
     );
   });
 }

@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import { PRAYER_ICONS } from "./Icons";
 import { ArrowRightIcon } from "./Icons";
 import { cn } from "../utils/cn";
@@ -11,6 +12,7 @@ interface Props {
   status: CardStatus;
   index: number;
   isTomorrow?: boolean;
+  ref?: Ref<HTMLDivElement>;
 }
 
 const TILE: Record<CardStatus, string> = {
@@ -34,14 +36,15 @@ const BADGE: Record<CardStatus, { text: string; cls: string } | null> = {
   idle: null,
 };
 
-export default function PrayerCard({ item, time, status, index, isTomorrow }: Props) {
+export default function PrayerCard({ item, time, status, index, isTomorrow, ref }: Props) {
   const Icon = PRAYER_ICONS[item.key] ?? PRAYER_ICONS.Dhuhr;
   const badge = BADGE[status];
   const highlighted = status !== "idle";
   return (
     <div
+      ref={ref}
       className={cn(
-        "animate-fadeUp relative flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition-all duration-300 sm:gap-4 sm:px-4 sm:py-3",
+        "animate-fadeUp relative flex scroll-mt-28 items-center gap-3 rounded-2xl border px-3 py-2.5 transition-all duration-300 sm:gap-4 sm:px-4 sm:py-3",
         ROW[status],
         highlighted && "sm:py-3.5",
       )}

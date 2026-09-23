@@ -93,7 +93,7 @@ export default function MonthPanel({
         <button
           onClick={() => shift(-1)}
           aria-label="Previous month"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] text-cream/70 transition hover:border-gold/40 hover:text-gold"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] text-cream/70 transition hover:border-gold/40 hover:text-gold"
         >
           ‹
         </button>
@@ -116,7 +116,7 @@ export default function MonthPanel({
         <button
           onClick={() => shift(1)}
           aria-label="Next month"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] text-cream/70 transition hover:border-gold/40 hover:text-gold"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] text-cream/70 transition hover:border-gold/40 hover:text-gold"
         >
           ›
         </button>

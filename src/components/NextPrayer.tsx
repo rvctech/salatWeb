@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { PRAYER_ICONS } from "./Icons";
 import type { Countdown, OrderItem } from "../lib/api";
 
@@ -8,6 +9,7 @@ interface Props {
   remaining: Countdown;
   progress: number;
   isTomorrow?: boolean;
+  style?: CSSProperties;
 }
 
 function pad(n: number) {
@@ -21,21 +23,23 @@ export default function NextPrayer({
   remaining,
   progress,
   isTomorrow,
+  style,
 }: Props) {
   const Icon = PRAYER_ICONS[next.key] ?? PRAYER_ICONS.Dhuhr;
   const pct = Math.round(progress * 100);
   return (
     <section
       aria-label={`Next prayer ${next.name} at ${formattedTime}`}
+      style={style}
       className="animate-fadeUp relative overflow-hidden rounded-3xl border border-gold/45 glass p-5 shadow-[0_0_60px_-15px_rgba(233,201,127,0.4)] sm:p-8"
     >
-      {/* ambient glow */}
+      {/* ambient glow — slow so the countdown stays the focal motion */}
       <div
         className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full blur-3xl"
         style={{
           background:
             "radial-gradient(circle, rgba(233,201,127,0.28), transparent 65%)",
-          animation: "glowPulse 9s ease-in-out infinite",
+          animation: "glowPulse 14s ease-in-out infinite",
         }}
       />
 
@@ -43,10 +47,6 @@ export default function NextPrayer({
         {/* left: identity */}
         <div className="flex items-center gap-4">
           <span className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-gold/30 to-gold/5 text-gold ring-1 ring-gold/40">
-            <span
-              className="absolute inset-0 rounded-2xl"
-              style={{ animation: "pulseRing 3.5s ease-out infinite" }}
-            />
             <Icon className="h-9 w-9" />
           </span>
           <div>

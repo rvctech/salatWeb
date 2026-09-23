@@ -25,9 +25,10 @@ Built with React + Vite + Tailwind.
 - React 19 + TypeScript
 - Vite 7 + vite-plugin-pwa (Workbox)
 - Tailwind CSS v4
-- Material UI icons (`@mui/icons-material`) + two custom glyphs (Kaaba, Qibla)
+- Zero-dependency inline SVG icons (Material glyph paths, inlined) + two custom glyphs (Kaaba, Qibla)
 - [Aladhan API](https://aladhan.com) for prayer times & Hijri dates
 - [OpenStreetMap Nominatim](https://nominatim.org) for geocoding
+- Adhan alert recording: "The Adhan - Muslim Call to Prayer" by Atcovi (Aaqib Azeez), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), via Wikimedia Commons — self-hosted in `public/adhan.mp3`
 
 ## 🚀 Getting started
 

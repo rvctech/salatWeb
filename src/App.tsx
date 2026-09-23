@@ -167,12 +167,26 @@ export default function App() {
   }, [location, settings.method, settings.school, data]);
 
   // Silently prefetch the current month on idle so Month view opens instantly.
+  // Deferred + connection-aware: 30 per-day requests share the pool with
+  // first-paint calls, so skip on Save-Data/2G and wait longer otherwise.
   useEffect(() => {
     if (!location || !data) return;
+    const conn = (
+      navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+      }
+    ).connection;
+    if (
+      conn?.saveData ||
+      conn?.effectiveType === "slow-2g" ||
+      conn?.effectiveType === "2g"
+    )
+      return;
     const s = settingsRef.current;
     const now = new Date();
     const controller = new AbortController();
     const run = () => {
+      if (document.visibilityState === "hidden") return;
       fetchMonthTimings(
         location.lat,
         location.lon,
@@ -189,13 +203,13 @@ export default function App() {
       typeof requestIdleCallback !== "undefined" &&
       typeof cancelIdleCallback !== "undefined"
     ) {
-      const id = requestIdleCallback(run);
+      const id = requestIdleCallback(run, { timeout: 8000 });
       return () => {
         controller.abort();
         cancelIdleCallback(id);
       };
     }
-    const id = setTimeout(run, 4000);
+    const id = setTimeout(run, 8000);
     return () => {
       controller.abort();
       clearTimeout(id);
@@ -229,12 +243,12 @@ export default function App() {
       )}
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-10">
-        {/* Bismillah banner */}
-        <div className="animate-fadeIn mb-4 flex items-center justify-center gap-4 text-center sm:mb-8">
+        {/* Bismillah banner — compact on phones so the timetable sits higher */}
+        <div className="animate-fadeIn mb-3 flex items-center justify-center gap-4 text-center sm:mb-8">
           <span className="hidden h-px w-12 bg-linear-to-r from-transparent to-gold/50 sm:block sm:w-20" />
           <span className="h-px w-10 bg-linear-to-r from-transparent to-gold/50 sm:hidden" />
           <p
-            className="font-arabic text-2xl leading-tight text-gold-soft drop-shadow-[0_0_18px_rgba(233,201,127,0.25)] sm:text-3xl"
+            className="font-arabic text-xl leading-tight text-gold-soft drop-shadow-[0_0_18px_rgba(233,201,127,0.25)] sm:text-3xl"
             dir="rtl"
           >
             بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
@@ -267,7 +281,7 @@ export default function App() {
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <button
                 onClick={() => setPanel("search")}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-cream/70 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent text-cream/70 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
                 aria-label="Search location"
                 title="Search location"
               >
@@ -276,7 +290,7 @@ export default function App() {
               <button
                 onClick={openLocate}
                 disabled={locating}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-cream/70 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold disabled:opacity-50"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent text-cream/70 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold disabled:opacity-50"
                 aria-label="Use my location"
                 title="Use my location"
               >
@@ -288,7 +302,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => setPanel("settings")}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] text-cream/75 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent text-cream/70 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold"
                 aria-label="Settings"
                 title="Settings"
               >
@@ -324,6 +338,7 @@ export default function App() {
               hijriOffset={settings.hijriOffset}
               offline={status === "error"}
               refreshing={status === "loading"}
+              onAlertError={setToast}
             />
           )}
         </main>

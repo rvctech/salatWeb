@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import Modal from "./Modal";
 import { GearIcon } from "./Icons";
 import { PRAYER_METHODS, THEMES } from "../lib/api";
+import { playAdhan, playPing, stopAdhan } from "../lib/notify";
 import type { Settings, ThemeId } from "../lib/api";
 
 interface Props {
@@ -28,7 +30,7 @@ function Segmented<T extends string | number>({
         <button
           key={String(o.value)}
           onClick={() => onChange(o.value)}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+          className={`min-h-[44px] rounded-lg px-3 py-2.5 text-sm font-medium transition ${
             value === o.value
               ? "bg-gold text-night shadow"
               : "text-cream/65 hover:text-cream"
@@ -48,6 +50,22 @@ export default function SettingsPanel({
   onChange,
 }: Props) {
   const method = PRAYER_METHODS.find((m) => m.id === settings.method);
+  const [previewFailed, setPreviewFailed] = useState(false);
+
+  // Never leave the Adhan playing behind a closed panel.
+  useEffect(() => {
+    if (!open) stopAdhan();
+  }, [open ]);
+
+  async function previewSound() {
+    setPreviewFailed(false);
+    stopAdhan();
+    const ok =
+      settings.alertSound === "adhan"
+        ? await playAdhan()
+        : await playPing(0.15);
+    if (!ok) setPreviewFailed(true);
+  }
 
   return (
     <Modal
@@ -160,12 +178,29 @@ export default function SettingsPanel({
           </label>
           <Segmented
             value={settings.alertSound}
-            onChange={(v) => onChange({ ...settings, alertSound: v })}
+            onChange={(v) => {
+              stopAdhan();
+              setPreviewFailed(false);
+              onChange({ ...settings, alertSound: v });
+            }}
             options={[
               { value: "ping", label: "Soft ping" },
               { value: "adhan", label: "Adhan" },
             ]}
           />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => void previewSound()}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold transition hover:bg-gold/20 active:scale-95"
+            >
+              Test {settings.alertSound === "adhan" ? "Adhan" : "ping"}
+            </button>
+            {previewFailed && (
+              <span className="text-xs text-danger">
+                Couldn't play sound — check volume and silent mode.
+              </span>
+            )}
+          </div>
           <p className="mt-1.5 text-xs text-cream/60">
             {settings.alertSound === "adhan"
               ? "Streams the call to prayer when alerts fire; falls back to ping offline."

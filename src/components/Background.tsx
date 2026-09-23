@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 
-/** Deterministic pseudo-random star field so layout is stable across renders. */
-const STARS = Array.from({ length: 34 }, (_, i) => {
+/** Deterministic pseudo-random star field so layout is stable across renders.
+ * Kept small (24 nodes) — each animated star is a compositing layer, and the
+ * field sits behind every frame of the 1s countdown tick. */
+const STARS = Array.from({ length: 24 }, (_, i) => {
   const r = (n: number) => {
     const x = Math.sin((i + 1) * n) * 10000;
     return x - Math.floor(x);
@@ -29,7 +31,7 @@ export default function Background() {
         style={{
           background:
             "radial-gradient(circle, var(--color-glow-1), transparent 62%)",
-          animation: "glowPulse 12s ease-in-out infinite",
+          animation: "glowPulse 20s ease-in-out infinite",
         }}
       />
       <div
@@ -37,7 +39,7 @@ export default function Background() {
         style={{
           background:
             "radial-gradient(circle, var(--color-glow-2), transparent 60%)",
-          animation: "glowPulse 16s ease-in-out infinite",
+          animation: "glowPulse 26s ease-in-out infinite",
         }}
       />
 
