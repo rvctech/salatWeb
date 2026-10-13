@@ -27,7 +27,7 @@ export default function Background() {
     >
       {/* soft colour glows — use CSS variables from current theme */}
       <div
-        className="absolute -right-32 -top-40 h-[36rem] w-[36rem] rounded-full blur-3xl"
+        className="ambient-glow absolute -right-32 -top-40 h-[36rem] w-[36rem] rounded-full blur-3xl"
         style={{
           background:
             "radial-gradient(circle, var(--color-glow-1), transparent 62%)",
@@ -35,7 +35,7 @@ export default function Background() {
         }}
       />
       <div
-        className="absolute -left-40 top-1/3 h-[30rem] w-[30rem] rounded-full blur-3xl"
+        className="ambient-glow absolute -left-40 top-1/3 h-[30rem] w-[30rem] rounded-full blur-3xl"
         style={{
           background:
             "radial-gradient(circle, var(--color-glow-2), transparent 60%)",

@@ -169,8 +169,16 @@ export default function App() {
   // Silently prefetch the current month on idle so Month view opens instantly.
   // Deferred + connection-aware: 30 per-day requests share the pool with
   // first-paint calls, so skip on Save-Data/2G and wait longer otherwise.
+  // Touch devices (iPad/phones) skip it entirely: the request storm plus
+  // repaints locks mobile Safari, and MonthPanel fetches on open instead
+  // via the shared in-memory cache.
   useEffect(() => {
     if (!location || !data) return;
+    try {
+      if (window.matchMedia?.("(hover: none)").matches) return;
+    } catch {
+      /* unknown — keep prefetch */
+    }
     const conn = (
       navigator as Navigator & {
         connection?: { saveData?: boolean; effectiveType?: string };

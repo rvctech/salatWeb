@@ -131,7 +131,7 @@ function QiblaDial({
     >
       {/* ambient glow behind dial */}
       <div
-        className="pointer-events-none absolute -inset-4 rounded-full blur-2xl"
+        className="ambient-glow pointer-events-none absolute -inset-4 rounded-full blur-2xl"
         style={{
           background:
             "radial-gradient(circle, rgba(233,201,127,0.14), transparent 65%)",

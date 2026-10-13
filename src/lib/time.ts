@@ -20,17 +20,39 @@ interface ZonedParts {
 }
 
 /** Wall-clock parts of an instant, expressed in the given IANA timezone. */
+const fmtCache = new Map<string, Intl.DateTimeFormat>();
+
+function getFmt(tz: string): Intl.DateTimeFormat {
+  const key = tz || "local";
+  let fmt = fmtCache.get(key);
+  if (!fmt) {
+    const opts: Intl.DateTimeFormatOptions = {
+      timeZone: tz || undefined,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    };
+    try {
+      fmt = new Intl.DateTimeFormat("en-CA", opts);
+    } catch {
+      // Stale/unknown IANA zone — fall back to device-local time instead
+      // of throwing inside every render tick.
+      const { timeZone: _tz, ...rest } = opts;
+      fmt = new Intl.DateTimeFormat("en-CA", rest);
+    }
+    // Only a couple of zones ever occur; cap defensively.
+    if (fmtCache.size > 8) fmtCache.clear();
+    fmtCache.set(key, fmt);
+  }
+  return fmt;
+}
+
 export function getZonedParts(tz: string, d = new Date()): ZonedParts {
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz || undefined,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+  const fmt = getFmt(tz);
   const parts = fmt.formatToParts(d);
   const g = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
   let hour = parseInt(g("hour"), 10);

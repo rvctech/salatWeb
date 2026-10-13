@@ -415,6 +415,27 @@ body {
   color: #fff;
 }
 
+/* ---------- Touch GPUs (iPad / phones) ---------- */
+/* backdrop-filter over large/sticky areas plus huge animated blurs can lock
+ * mobile Safari's compositor — the page goes fully unresponsive as soon as
+ * results paint, while desktop stays smooth. On touch devices drop the blur
+ * (keep the tint) and still the ambient animation; desktop keeps everything. */
+@media (hover: none) {
+  .glass,
+  .glass-strong,
+  .backdrop-blur-xl,
+  .backdrop-blur-md {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .ambient-glow {
+    animation: none !important;
+  }
+  [data-stars] {
+    display: none !important;
+  }
+}
+
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   html *,
