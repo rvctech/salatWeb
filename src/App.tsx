@@ -20,6 +20,31 @@ import Results from "./components/Results";
 import Welcome from "./components/Welcome";
 import ErrorView from "./components/ErrorView";
 import Toast from "./components/Toast";
+import NamesSection from "./components/NamesSection";
+import PrayerTracker from "./components/PrayerTracker";
+import DhikrCounter from "./components/DhikrCounter";
+import DuaLibrary from "./components/DuaLibrary";
+import FastingTracker from "./components/FastingTracker";
+import { getRamadanRange } from "./lib/islamicEvents";
+
+type Section = "times" | "names" | "tracker" | "dhikr" | "duas";
+
+const SECTION_HASH: Record<Section, string> = {
+  times: "#",
+  names: "#names",
+  tracker: "#tracker",
+  dhikr: "#dhikr",
+  duas: "#duas",
+};
+
+function sectionFromHash(): Section {
+  const h = typeof window !== "undefined" ? window.location.hash : "";
+  if (h === "#names") return "names";
+  if (h === "#tracker") return "tracker";
+  if (h === "#dhikr") return "dhikr";
+  if (h === "#duas") return "duas";
+  return "times";
+}
 
 const SearchPanel = lazy(() => import("./components/SearchPanel"));
 const SettingsPanel = lazy(() => import("./components/SettingsPanel"));
@@ -36,6 +61,7 @@ export default function App() {
   const [panel, setPanel] = useState<"search" | "settings" | null>(null);
   const [locating, setLocating] = useState(false);
   const [tomorrow, setTomorrow] = useState<PrayerData | null>(null);
+  const [section, setSection] = useState<Section>(() => sectionFromHash());
 
   const settingsRef = useRef(settings);
   const didInit = useRef(false);
@@ -119,6 +145,22 @@ export default function App() {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
+
+  // Deep-linkable sections: #names / #tracker / #dhikr, back button works.
+  useEffect(() => {
+    const sync = () => setSection(sectionFromHash());
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  function goSection(s: Section) {
+    setSection(s);
+    try {
+      window.history.replaceState(null, "", SECTION_HASH[s]);
+    } catch {
+      /* ignore */
+    }
+  }
 
   // Apply theme to document + sync PWA theme-color.
   useEffect(() => {
@@ -239,6 +281,9 @@ export default function App() {
   const hasData = Boolean(data && location);
   const firstLoad = status === "loading" && !data;
   const busy = locating || firstLoad;
+  // Ramadan-only fasting tracker. Cheap check per render so a midnight
+  // rollover shows/hides it without reload.
+  const ramadanRange = getRamadanRange();
 
   return (
     <>
@@ -320,8 +365,50 @@ export default function App() {
           </div>
         </header>
 
+        {/* Top-level sections — separate views so the main page stays focused. */}
+        <nav
+          aria-label="Sections"
+          role="tablist"
+          className="mx-auto mt-4 grid w-full max-w-xl grid-cols-5 gap-1 rounded-2xl border border-[var(--color-glass-border)] bg-[var(--color-glass-bg)] p-1 sm:mt-6"
+        >
+          {(
+            [
+              { v: "times", label: "Times" },
+              { v: "tracker", label: "Tracker" },
+              { v: "dhikr", label: "Dhikr" },
+              { v: "duas", label: "Duas" },
+              { v: "names", label: "Names" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.v}
+              role="tab"
+              aria-selected={section === t.v}
+              onClick={() => goSection(t.v)}
+              className={`min-h-[44px] truncate rounded-xl px-1 py-2.5 text-xs font-medium transition sm:px-3 sm:text-sm ${
+                section === t.v
+                  ? "bg-gold text-night shadow"
+                  : "text-cream/65 hover:text-cream"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
         <main className="mt-4 flex-1 sm:mt-6">
-          {status === "error" && !hasData ? (
+          {section === "names" ? (
+            <NamesSection />
+          ) : section === "tracker" ? (
+            <div className="space-y-5">
+              <PrayerTracker />
+              {ramadanRange && <FastingTracker range={ramadanRange} />}
+            </div>
+          ) : section === "dhikr" ? (
+            <DhikrCounter />
+          ) : section === "duas" ? (
+            <DuaLibrary />
+          ) : status === "error" && !hasData ? (
             <ErrorView
               message={error ?? "Something went wrong."}
               onRetry={openLocate}

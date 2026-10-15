@@ -118,11 +118,34 @@ export async function playPing(volume = 0.18): Promise<boolean> {
   }
 }
 
+/** Ascending three-note chime for completed goals (offline-safe synth). */
+export async function playCelebration(volume = 0.18): Promise<boolean> {
+  const ac = await getContext();
+  if (!ac) return false;
+  try {
+    const t0 = ac.currentTime + 0.05;
+    [659.25, 880, 1318.51].forEach((freq, i) => {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      const start = t0 + i * 0.16;
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, volume), start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
+      osc.connect(gain).connect(ac.destination);
+      osc.start(start);
+      osc.stop(start + 0.35);
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /* Vibration — only exists on Android Chrome over HTTPS (secure context).
  * iPhones and desktops expose no vibration hardware to the web. */
-
-export function vibrateSupported(): boolean {
-  try {
+export function vibrateSupported(): boolean {  try {
     return "vibrate" in navigator;
   } catch {
     return false;

@@ -21,6 +21,9 @@ import {
 import { useNow } from "../hooks/useNow";
 import LocationBar from "./LocationBar";
 import NextPrayer from "./NextPrayer";
+import IslamicCountdown from "./IslamicCountdown";
+import FastingCard from "./FastingCard";
+import { getRamadanRange } from "../lib/islamicEvents";
 import PrayerCard, { type CardStatus } from "./PrayerCard";
 import type { LocationInfo, PrayerData } from "../lib/types";
 
@@ -93,6 +96,9 @@ export default function Results({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [location.lat, location.lon],
   );
+  // Ramadan-only: Suhoor/Iftar card. Cheap date check, runs per render
+  // so a midnight rollover into Ramadan shows up without reload.
+  const ramadanRange = getRamadanRange();
 
   // Live tab title countdown.
   useEffect(() => {
@@ -184,6 +190,16 @@ export default function Results({
         hijriOffset={hijriOffset}
         style={{ animationDelay: "20ms" }}
       />
+
+      <IslamicCountdown />
+
+      {ramadanRange && (
+        <FastingCard
+          fajr={data.timings.Fajr}
+          maghrib={data.timings.Maghrib}
+          range={ramadanRange}
+        />
+      )}
 
       <NextPrayer
         key={`${nextSalah.key}-${isTomorrow ? "tmr" : "today"}`}
